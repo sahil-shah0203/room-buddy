@@ -78,7 +78,15 @@ const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string
 function createPresetShape(preset: PresetShape, width: number, depth: number): RoomShape {
   switch (preset) {
     case "rectangle":
-      return { type: "rectangle", width, depth };
+      return {
+        type: "polygon",
+        vertices: [
+          { id: nanoid(), x: 0, y: 0 },
+          { id: nanoid(), x: width, y: 0 },
+          { id: nanoid(), x: width, y: depth },
+          { id: nanoid(), x: 0, y: depth },
+        ],
+      };
 
     case "l-shape": {
       // L-shape: cut out top-right corner
@@ -134,7 +142,18 @@ const DEFAULT_APPEARANCE: RoomAppearance = {
 };
 
 export const useRoomStore = create<RoomState & Actions>((set, get) => ({
-  room: { shape: { type: "rectangle", width: 12, depth: 10 }, unit: "ft" },
+  room: {
+    shape: {
+      type: "polygon",
+      vertices: [
+        { id: "v1", x: 0, y: 0 },
+        { id: "v2", x: 12, y: 0 },
+        { id: "v3", x: 12, y: 10 },
+        { id: "v4", x: 0, y: 10 },
+      ],
+    },
+    unit: "ft",
+  },
   items: [],
   openings: [],
   appearance: DEFAULT_APPEARANCE,
@@ -172,7 +191,7 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     set((state) => ({
       ...state,
       room: { ...state.room, shape },
-      editMode: preset === "rectangle" ? "furniture" : "shape",
+      editMode: "shape",
     }));
   },
 
@@ -337,10 +356,21 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
 
   setRoom: (width, depth, unit) =>
     set((s) => {
-      // Update the shape dimensions
-      const shape: RoomShape = s.room.shape.type === "rectangle"
-        ? { type: "rectangle", width: Math.max(1, width), depth: Math.max(1, depth) }
-        : s.room.shape; // For polygons, dimensions are determined by vertices
+      // Scale polygon vertices to new dimensions
+      const currentDims = getRoomDimensions(s.room);
+      const scaleX = Math.max(1, width) / currentDims.width;
+      const scaleY = Math.max(1, depth) / currentDims.depth;
+
+      const shape: RoomShape = s.room.shape.type === "polygon"
+        ? {
+            type: "polygon",
+            vertices: s.room.shape.vertices.map((v) => ({
+              ...v,
+              x: v.x * scaleX,
+              y: v.y * scaleY,
+            })),
+          }
+        : { type: "rectangle", width: Math.max(1, width), depth: Math.max(1, depth) };
 
       return {
         ...s,
@@ -463,4 +493,106 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
 
     set((prev) => ({ ...prev, items: next }));
   },
+
+  // Wall openings
+  addOpening: (type, wallIndex) => {
+    const s = get();
+    const existingOnWall = s.openings.filter(o => o.wallIndex === wallIndex);
+
+    // Find a position that doesn't overlap with existing openings
+    // Try positions from 0.2 to 0.8 in increments
+    const width = type === "door" ? 3 : 4;
+    const dims = getRoomDimensions(s.room);
+    const wallLength = s.room.shape.type === "polygon"
+      ? (() => {
+          const verts = s.room.shape.vertices;
+          const start = verts[wallIndex];
+          const end = verts[(wallIndex + 1) % verts.length];
+          return Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+        })()
+      : wallIndex % 2 === 0 ? dims.width : dims.depth;
+
+    const widthAsPercent = width / wallLength;
+
+    // Find first non-overlapping position
+    let position = 0.15;
+    const step = 0.1;
+    while (position < 0.85) {
+      const overlaps = existingOnWall.some(o => {
+        const oWidthPercent = o.width / wallLength;
+        const oStart = o.position - oWidthPercent / 2;
+        const oEnd = o.position + oWidthPercent / 2;
+        const newStart = position - widthAsPercent / 2;
+        const newEnd = position + widthAsPercent / 2;
+        return !(newEnd < oStart || newStart > oEnd);
+      });
+      if (!overlaps) break;
+      position += step;
+    }
+
+    const opening: WallOpening = {
+      id: nanoid(),
+      type,
+      wallIndex,
+      position: Math.min(0.85, Math.max(0.15, position)),
+      width,
+      height: type === "door" ? 7 : 3,
+      fromFloor: type === "door" ? 0 : 3,
+    };
+    set((state) => ({
+      ...state,
+      openings: [...state.openings, opening],
+      selectedOpeningId: opening.id,
+    }));
+  },
+
+  removeOpening: (id) =>
+    set((s) => ({
+      ...s,
+      openings: s.openings.filter((o) => o.id !== id),
+      selectedOpeningId: s.selectedOpeningId === id ? null : s.selectedOpeningId,
+    })),
+
+  selectOpening: (id) => set((s) => ({ ...s, selectedOpeningId: id })),
+
+  updateOpening: (id, updates) =>
+    set((s) => ({
+      ...s,
+      openings: s.openings.map((o) =>
+        o.id === id ? { ...o, ...updates } : o
+      ),
+    })),
+
+  // Room appearance
+  setWallColor: (color) =>
+    set((s) => ({
+      ...s,
+      appearance: { ...s.appearance, wallColor: color },
+    })),
+
+  setFloorType: (type) =>
+    set((s) => ({
+      ...s,
+      appearance: { ...s.appearance, floorType: type },
+    })),
+
+  setFloorColor: (color) =>
+    set((s) => ({
+      ...s,
+      appearance: { ...s.appearance, floorColor: color },
+    })),
+
+  setCeilingColor: (color) =>
+    set((s) => ({
+      ...s,
+      appearance: { ...s.appearance, ceilingColor: color },
+    })),
+
+  setItemColor: (id, color) =>
+    set((s) => ({
+      ...s,
+      items: s.items.map((it) =>
+        it.id === id ? { ...it, color } : it
+      ),
+    })),
 }));

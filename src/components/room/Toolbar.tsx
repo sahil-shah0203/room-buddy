@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
 import { getRoomDimensions } from "@/lib/geometry/collision";
 
@@ -9,18 +10,23 @@ export default function Toolbar() {
     gridSize,
     editMode,
     selectedVertexId,
-    setRoom,
+    selectedOpeningId,
+    openings,
     setGridSize,
     addItem,
     removeSelected,
     setEditMode,
     applyPresetShape,
-    convertToPolygon,
     removeVertex,
+    addOpening,
+    removeOpening,
   } = useRoomStore();
 
+  const [selectedWall, setSelectedWall] = useState(0);
+
   const dims = getRoomDimensions(room);
-  const isRectangle = room.shape.type === "rectangle";
+  const vertexCount = room.shape.type === "polygon" ? room.shape.vertices.length : 4;
+  const wallCount = vertexCount;
 
   return (
     <div className="rounded-2xl border bg-white p-4 shadow-sm">
@@ -59,15 +65,9 @@ export default function Toolbar() {
           <button className="rounded-xl border px-3 py-2" onClick={() => addItem("table")}>Table</button>
 
           <div className="ml-auto flex items-center gap-3">
-            {room.shape.type === "rectangle" ? (
-              <span className="text-sm text-gray-500">
-                {room.shape.width} × {room.shape.depth} {room.unit}
-              </span>
-            ) : (
-              <span className="text-sm text-gray-500">
-                {dims.width.toFixed(1)} × {dims.depth.toFixed(1)} {room.unit}
-              </span>
-            )}
+            <span className="text-sm text-gray-500">
+              {dims.width.toFixed(1)} × {dims.depth.toFixed(1)} {room.unit}
+            </span>
 
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-400">Grid:</span>
@@ -90,42 +90,33 @@ export default function Toolbar() {
         </div>
       ) : (
         /* Shape mode controls */
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="text-sm font-medium text-gray-700">Presets:</div>
-          <button
-            className={`rounded-xl border px-3 py-2 ${isRectangle ? "bg-gray-100" : ""}`}
-            onClick={() => applyPresetShape("rectangle")}
-          >
-            Rectangle
-          </button>
-          <button
-            className="rounded-xl border px-3 py-2"
-            onClick={() => applyPresetShape("l-shape")}
-          >
-            L-Shape
-          </button>
-          <button
-            className="rounded-xl border px-3 py-2"
-            onClick={() => applyPresetShape("u-shape")}
-          >
-            U-Shape
-          </button>
-
-          {isRectangle && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-sm font-medium text-gray-700">Presets:</div>
             <button
               className="rounded-xl border px-3 py-2"
-              onClick={convertToPolygon}
+              onClick={() => applyPresetShape("rectangle")}
             >
-              Custom Shape
+              Rectangle
             </button>
-          )}
+            <button
+              className="rounded-xl border px-3 py-2"
+              onClick={() => applyPresetShape("l-shape")}
+            >
+              L-Shape
+            </button>
+            <button
+              className="rounded-xl border px-3 py-2"
+              onClick={() => applyPresetShape("u-shape")}
+            >
+              U-Shape
+            </button>
 
-          {!isRectangle && (
             <div className="ml-auto flex items-center gap-3">
               <span className="text-sm text-gray-500">
-                {room.shape.vertices.length} vertices
+                {vertexCount} vertices
               </span>
-              {selectedVertexId && room.shape.vertices.length > 3 && (
+              {selectedVertexId && vertexCount > 3 && (
                 <button
                   className="rounded-xl border border-red-300 px-3 py-2 text-red-600"
                   onClick={() => removeVertex(selectedVertexId)}
@@ -134,10 +125,56 @@ export default function Toolbar() {
                 </button>
               )}
               <span className="text-xs text-gray-400">
-                Click on edges to add vertices
+                Click edges to add vertices
               </span>
             </div>
-          )}
+          </div>
+
+          {/* Openings (windows/doors) */}
+          <div className="flex flex-wrap items-center gap-3 border-t pt-3">
+            <div className="text-sm font-medium text-gray-700">Openings:</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-400">Wall:</span>
+              <select
+                className="rounded-lg border px-2 py-1 text-sm"
+                value={selectedWall}
+                onChange={(e) => setSelectedWall(Number(e.target.value))}
+              >
+                {Array.from({ length: wallCount }).map((_, i) => (
+                  <option key={i} value={i}>
+                    {i + 1}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              className="rounded-xl border px-3 py-2"
+              onClick={() => addOpening("door", selectedWall)}
+            >
+              + Door
+            </button>
+            <button
+              className="rounded-xl border px-3 py-2"
+              onClick={() => addOpening("window", selectedWall)}
+            >
+              + Window
+            </button>
+
+            {openings.length > 0 && (
+              <span className="text-sm text-gray-500">
+                {openings.length} opening{openings.length !== 1 ? "s" : ""}
+              </span>
+            )}
+
+            {selectedOpeningId && (
+              <button
+                className="rounded-xl border border-red-300 px-3 py-2 text-red-600"
+                onClick={() => removeOpening(selectedOpeningId)}
+              >
+                Delete Opening
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

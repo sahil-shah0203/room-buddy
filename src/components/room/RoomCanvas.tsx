@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
-import type { Item, Vertex, FurnitureType } from "@/types/room";
+import type { Item, Vertex, FurnitureType, WallOpening } from "@/types/room";
 import { getBoundingBox, shapeToSvgPath } from "@/lib/geometry/polygon";
 
 // Furniture styling configuration
@@ -21,14 +21,17 @@ type DragState =
   | { type: "none" }
   | { type: "drag"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } }
   | { type: "vertex"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } }
-  | { type: "resize"; id: string; handle: string; startPx: { x: number; y: number }; startItem: { x: number; y: number; w: number; d: number } };
+  | { type: "resize"; id: string; handle: string; startPx: { x: number; y: number }; startItem: { x: number; y: number; w: number; d: number } }
+  | { type: "opening"; id: string; mode: "move" | "resize-left" | "resize-right"; wallIndex: number; startPx: { x: number; y: number }; startPos: number; startWidth: number };
 
 export default function RoomCanvas() {
   const {
     room,
     items,
+    openings,
     selectedItemId,
     selectedVertexId,
+    selectedOpeningId,
     gridSize,
     editMode,
     selectItem,
@@ -37,6 +40,8 @@ export default function RoomCanvas() {
     selectVertex,
     moveVertex,
     addVertex,
+    selectOpening,
+    updateOpening,
   } = useRoomStore();
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -194,6 +199,42 @@ export default function RoomCanvas() {
         moveItem(drag.id, newX, newY, { snap: false });
       }
       resizeItem(drag.id, newW, newD);
+    } else if (drag.type === "opening") {
+      const mouseRoom = { x: pxToRoom(px.x), y: pxToRoom(px.y) };
+      const opening = openings.find(o => o.id === drag.id);
+      if (!opening) return;
+
+      if (drag.mode === "move") {
+        // Find closest point on perimeter and which wall it's on
+        const { wallIndex, position } = findClosestWallPosition(mouseRoom, opening.width);
+        updateOpening(drag.id, { wallIndex, position });
+      } else {
+        // Resize mode - stay on same wall
+        const wall = getWallInfo(drag.wallIndex);
+        const dxPx = px.x - drag.startPx.x;
+        const dyPx = px.y - drag.startPx.y;
+
+        // Project movement onto wall direction
+        const wallDirX = Math.cos(wall.angle);
+        const wallDirY = Math.sin(wall.angle);
+        const moveAlongWall = (pxToRoom(dxPx) * wallDirX + pxToRoom(dyPx) * wallDirY);
+
+        if (drag.mode === "resize-left") {
+          const widthDelta = -moveAlongWall;
+          const newWidth = Math.max(1, drag.startWidth + widthDelta);
+          const halfWidthRatio = (newWidth / 2) / wall.length;
+          const posDelta = (newWidth - drag.startWidth) / wall.length / 2;
+          const newPos = Math.max(halfWidthRatio, Math.min(1 - halfWidthRatio, drag.startPos - posDelta));
+          updateOpening(drag.id, { width: newWidth, position: newPos });
+        } else if (drag.mode === "resize-right") {
+          const widthDelta = moveAlongWall;
+          const newWidth = Math.max(1, drag.startWidth + widthDelta);
+          const halfWidthRatio = (newWidth / 2) / wall.length;
+          const posDelta = (newWidth - drag.startWidth) / wall.length / 2;
+          const newPos = Math.max(halfWidthRatio, Math.min(1 - halfWidthRatio, drag.startPos + posDelta));
+          updateOpening(drag.id, { width: newWidth, position: newPos });
+        }
+      }
     }
   }
 
@@ -218,12 +259,234 @@ export default function RoomCanvas() {
     addVertex(startVertex.id, snappedX, snappedY);
   }
 
+  function onPointerDownOpening(e: React.PointerEvent, opening: WallOpening, mode: "move" | "resize-left" | "resize-right") {
+    if (editMode !== "shape") return;
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
+    selectOpening(opening.id);
+
+    const bounds = wrapRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const px = { x: e.clientX - bounds.left - 20, y: e.clientY - bounds.top - 20 };
+    setDrag({
+      type: "opening",
+      id: opening.id,
+      mode,
+      wallIndex: opening.wallIndex,
+      startPx: px,
+      startPos: opening.position,
+      startWidth: opening.width,
+    });
+  }
+
   function onCanvasClick() {
     if (editMode === "furniture") {
       selectItem(null);
     } else {
       selectVertex(null);
+      selectOpening(null);
     }
+  }
+
+  // Get wall info for opening calculations
+  function getWallInfo(wallIndex: number) {
+    const verts = room.shape.type === "polygon" ? room.shape.vertices : [
+      { x: 0, y: 0 },
+      { x: 12, y: 0 },
+      { x: 12, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    const start = verts[wallIndex];
+    const end = verts[(wallIndex + 1) % verts.length];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    return { start, end, dx, dy, length, angle };
+  }
+
+  // Find the closest wall and position for a point (used for dragging openings around corners)
+  function findClosestWallPosition(point: { x: number; y: number }, openingWidth: number): { wallIndex: number; position: number } {
+    const verts = room.shape.type === "polygon" ? room.shape.vertices : [
+      { x: 0, y: 0 },
+      { x: 12, y: 0 },
+      { x: 12, y: 10 },
+      { x: 0, y: 10 },
+    ];
+
+    let bestWall = 0;
+    let bestPosition = 0.5;
+    let bestDistance = Infinity;
+
+    for (let i = 0; i < verts.length; i++) {
+      const start = verts[i];
+      const end = verts[(i + 1) % verts.length];
+      const wallDx = end.x - start.x;
+      const wallDy = end.y - start.y;
+      const wallLength = Math.sqrt(wallDx * wallDx + wallDy * wallDy);
+
+      if (wallLength < 0.1) continue; // Skip degenerate walls
+
+      // Project point onto wall line
+      const t = Math.max(0, Math.min(1,
+        ((point.x - start.x) * wallDx + (point.y - start.y) * wallDy) / (wallLength * wallLength)
+      ));
+
+      // Closest point on wall
+      const closestX = start.x + t * wallDx;
+      const closestY = start.y + t * wallDy;
+
+      // Distance from point to wall
+      const dist = Math.sqrt((point.x - closestX) ** 2 + (point.y - closestY) ** 2);
+
+      if (dist < bestDistance) {
+        bestDistance = dist;
+        bestWall = i;
+
+        // Calculate position along wall (0-1), clamped so opening stays within bounds
+        const halfWidthRatio = (openingWidth / 2) / wallLength;
+        bestPosition = Math.max(halfWidthRatio, Math.min(1 - halfWidthRatio, t));
+      }
+    }
+
+    return { wallIndex: bestWall, position: bestPosition };
+  }
+
+  // Render wall opening (door or window)
+  function renderOpening(opening: WallOpening) {
+    const wall = getWallInfo(opening.wallIndex);
+    const isSelected = opening.id === selectedOpeningId && editMode === "shape";
+
+    // Calculate position on wall
+    const centerAlongWall = wall.length * opening.position;
+    const halfWidth = opening.width / 2;
+    const startAlongWall = centerAlongWall - halfWidth;
+
+    // Calculate actual coordinates
+    const cos = Math.cos(wall.angle);
+    const sin = Math.sin(wall.angle);
+
+    const centerX = wall.start.x + cos * centerAlongWall;
+    const centerY = wall.start.y + sin * centerAlongWall;
+
+    const startX = wall.start.x + cos * startAlongWall;
+    const startY = wall.start.y + sin * startAlongWall;
+    const endX = wall.start.x + cos * (startAlongWall + opening.width);
+    const endY = wall.start.y + sin * (startAlongWall + opening.width);
+
+    const isDoor = opening.type === "door";
+    const color = isDoor ? "#8B4513" : "#87ceeb";
+    const strokeColor = isDoor ? "#654321" : "#4a90d9";
+
+    return (
+      <g key={opening.id}>
+        {/* Invisible wide hit area for easier dragging */}
+        <line
+          x1={roomToPx(startX)}
+          y1={roomToPx(startY)}
+          x2={roomToPx(endX)}
+          y2={roomToPx(endY)}
+          stroke="transparent"
+          strokeWidth={24}
+          strokeLinecap="round"
+          style={{ cursor: editMode === "shape" ? "grab" : "default" }}
+          onPointerDown={(e) => onPointerDownOpening(e, opening, "move")}
+        />
+
+        {/* Border/highlight */}
+        <line
+          x1={roomToPx(startX)}
+          y1={roomToPx(startY)}
+          x2={roomToPx(endX)}
+          y2={roomToPx(endY)}
+          stroke={isSelected ? "#000" : strokeColor}
+          strokeWidth={isSelected ? 10 : 8}
+          strokeLinecap="round"
+          style={{ pointerEvents: "none" }}
+        />
+        {/* Opening line on wall (visible) */}
+        <line
+          x1={roomToPx(startX)}
+          y1={roomToPx(startY)}
+          x2={roomToPx(endX)}
+          y2={roomToPx(endY)}
+          stroke={color}
+          strokeWidth={isSelected ? 6 : 4}
+          strokeLinecap="round"
+          style={{ pointerEvents: "none" }}
+        />
+
+        {/* Door swing arc indicator */}
+        {isDoor && (
+          <path
+            d={`M ${roomToPx(startX)} ${roomToPx(startY)}
+                A ${roomToPx(opening.width)} ${roomToPx(opening.width)} 0 0 1
+                ${roomToPx(startX + cos * opening.width - sin * opening.width * 0.7)}
+                ${roomToPx(startY + sin * opening.width + cos * opening.width * 0.7)}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={1.5}
+            strokeDasharray="4 2"
+            style={{ pointerEvents: "none" }}
+          />
+        )}
+
+        {/* Window cross pattern */}
+        {!isDoor && (
+          <>
+            <line
+              x1={roomToPx(centerX)}
+              y1={roomToPx(centerY - 0.15)}
+              x2={roomToPx(centerX)}
+              y2={roomToPx(centerY + 0.15)}
+              stroke="white"
+              strokeWidth={2}
+              style={{ pointerEvents: "none" }}
+            />
+          </>
+        )}
+
+        {/* Label */}
+        <text
+          x={roomToPx(centerX)}
+          y={roomToPx(centerY) - 12}
+          fontSize={10}
+          fill="#333"
+          textAnchor="middle"
+          style={{ pointerEvents: "none" }}
+        >
+          {isDoor ? "Door" : "Window"} ({opening.width.toFixed(1)})
+        </text>
+
+        {/* Resize handles when selected */}
+        {isSelected && (
+          <>
+            <circle
+              cx={roomToPx(startX)}
+              cy={roomToPx(startY)}
+              r={6}
+              fill="white"
+              stroke="#000"
+              strokeWidth={2}
+              style={{ cursor: "ew-resize" }}
+              onPointerDown={(e) => onPointerDownOpening(e, opening, "resize-left")}
+            />
+            <circle
+              cx={roomToPx(endX)}
+              cy={roomToPx(endY)}
+              r={6}
+              fill="white"
+              stroke="#000"
+              strokeWidth={2}
+              style={{ cursor: "ew-resize" }}
+              onPointerDown={(e) => onPointerDownOpening(e, opening, "resize-right")}
+            />
+          </>
+        )}
+      </g>
+    );
   }
 
   // Render furniture item with distinctive styling
@@ -370,7 +633,7 @@ export default function RoomCanvas() {
             strokeWidth={2}
           />
 
-          {/* Edge click targets for adding vertices */}
+          {/* Edge click targets for adding vertices (rendered first, below openings) */}
           {editMode === "shape" && room.shape.type === "polygon" && (
             <g>
               {vertices.map((v, i) => {
@@ -391,6 +654,9 @@ export default function RoomCanvas() {
               })}
             </g>
           )}
+
+          {/* Wall openings (doors/windows) - rendered on top of edge targets */}
+          {openings.map((opening) => renderOpening(opening))}
 
           {/* Furniture items */}
           {items.map((it) => renderFurnitureItem(it))}
