@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* 
+  Phase 1: force light mode for clarity
+  Dark mode can be added later intentionally
+*/
+@layer base {
+  html,
+  body {
+    @apply bg-white text-gray-900;
+  }
+}
+
+/* Optional: better default rendering */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
