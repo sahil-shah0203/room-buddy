@@ -1,15 +1,35 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
 import type { Item } from "@/types/room";
+import { rectsOverlap } from "@/lib/geometry/collision";
 
 type DragState =
   | { type: "none" }
   | { type: "drag"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } };
 
+function isCollision(items: Item[], idx: number): boolean {
+  const a = items[idx];
+  if (!a) return false;
+  for (let j = 0; j < items.length; j++) {
+    if (j === idx) continue;
+    if (rectsOverlap(a, items[j])) return true;
+  }
+  return false;
+}
+
 export default function RoomCanvas() {
-  const { room, items, selectedItemId, gridSize, selectItem, moveItem } = useRoomStore();
+  // ---- Stable selectors (avoid getServerSnapshot loops) ----
+  const room = useRoomStore((s) => s.room);
+  const items = useRoomStore((s) => s.items);
+  const previewItems = useRoomStore((s) => s.previewItems);
+  const selectedItemId = useRoomStore((s) => s.selectedItemId);
+  const gridSize = useRoomStore((s) => s.gridSize);
+
+  const selectItem = useRoomStore((s) => s.selectItem);
+  const moveItem = useRoomStore((s) => s.moveItem);
+
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<DragState>({ type: "none" });
 
@@ -39,6 +59,12 @@ export default function RoomCanvas() {
     }
     return lines;
   }, [room.width, room.depth, gridSize, scale]);
+
+  // Preview collision map (only for preview layer)
+  const previewCollision = useMemo(() => {
+    if (!previewItems || previewItems.length === 0) return null;
+    return previewItems.map((_, idx) => isCollision(previewItems, idx));
+  }, [previewItems]);
 
   function onPointerDownItem(e: React.PointerEvent, item: Item) {
     e.stopPropagation();
@@ -74,13 +100,17 @@ export default function RoomCanvas() {
     if (drag.type !== "none") setDrag({ type: "none" });
   }
 
+  function onPointerDownCanvas() {
+    selectItem(null);
+  }
+
   return (
     <div
       ref={wrapRef}
       className="rounded-2xl border bg-white p-5 shadow-sm select-none"
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerDown={() => useRoomStore.getState().selectItem(null)}
+      onPointerDown={onPointerDownCanvas}
     >
       <svg width={canvasPx} height={canvasPx} className="block">
         {/* translate to add padding */}
@@ -111,7 +141,48 @@ export default function RoomCanvas() {
             strokeWidth={2}
           />
 
-          {/* items */}
+          {/* --- GHOST PREVIEW LAYER --- */}
+          {previewItems && previewItems.length > 0 && (
+            <g>
+              {previewItems.map((it, i) => {
+                const collides = previewCollision ? previewCollision[i] : false;
+
+                // Styling strategy:
+                // - Keep "currentColor" but change opacity & dash.
+                // - If collision: use red-ish stroke/fill for clarity.
+                const stroke = collides ? "#dc2626" : "currentColor"; // tailwind red-600
+                const fill = collides ? "#dc2626" : "currentColor";
+
+                return (
+                  <g
+                    key={it.id}
+                    transform={`translate(${roomToPx(it.x)},${roomToPx(it.y)})`}
+                    style={{ pointerEvents: "none" }}
+                  >
+                    <rect
+                      width={roomToPx(it.w)}
+                      height={roomToPx(it.d)}
+                      rx={10}
+                      ry={10}
+                      fill={fill}
+                      opacity={collides ? 0.12 : 0.08}
+                      stroke={stroke}
+                      strokeWidth={2}
+                      strokeDasharray="6 4"
+                    />
+                    <text x={10} y={22} fontSize={14} fill={stroke} opacity={0.9}>
+                      {it.label ?? it.type}
+                    </text>
+                    <text x={10} y={42} fontSize={12} fill={stroke} opacity={0.65}>
+                      {it.w}×{it.d} {room.unit} (preview)
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {/* --- REAL ITEMS (interactive) --- */}
           {items.map((it) => {
             const isSel = it.id === selectedItemId;
             return (

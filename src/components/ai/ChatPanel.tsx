@@ -18,17 +18,19 @@ export default function ChatPanel() {
   const roomState = { room, items, gridSize, selectedItemId };
 
   // ---- Local state ----
-  const [log, setLog] = useState<Msg[]>([
-    {
-      role: "assistant",
-      text: "Tell me what you want to design (cozy, modern, movie night, desk setup, etc).",
-    },
-  ]);
+  const chatLog = useRoomStore((s) => s.chatLog);
+  const setChatLog = useRoomStore((s) => s.setChatLog);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ---- Send message to AI ----
+  function shouldPlan(text: string) {
+    return /(add|place|move|rotate|remove|layout|design|decorate|cozy|modern|minimal|rug|sofa|bed|desk|chair|table|tv)/i.test(
+      text
+    );
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
@@ -36,39 +38,39 @@ export default function ChatPanel() {
     setError(null);
     setInput("");
 
-    const nextLog: Msg[] = [...log, { role: "user", text }];
-    setLog(nextLog);
+    const nextLog: Msg[] = [...chatLog, { role: "user", text }];
+    setChatLog(nextLog);
     setLoading(true);
 
     try {
+      const mode = shouldPlan(text) ? "plan" : "chat";
+
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: nextLog,
-          roomState,
-        }),
+        body: JSON.stringify({ mode, messages: nextLog, roomState }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
         setError(data?.error ?? "AI error");
-        setLog((l) => [
-          ...l,
-          { role: "assistant" as const, text: "Something went wrong." },
-        ]);
+        setChatLog([...nextLog, { role: "assistant", text: "Something went wrong." }]);
         return;
       }
 
-      // 🔑 Store the AI plan globally
-      setAiPlan(data);
+      if (mode === "chat") {
+        setChatLog([...nextLog, { role: "assistant", text: data.reply }]);
+        return;
+      }
 
-      setLog((l) => [
-        ...l,
+      // plan mode
+      setAiPlan(data);
+      setChatLog([
+        ...nextLog,
         {
-          role: "assistant" as const,
-          text: "I’ve suggested a layout. Check the AI Suggestions panel to apply it.",
+          role: "assistant",
+          text: "I suggested a layout — review it in AI Suggestions, then apply if you like it.",
         },
       ]);
     } catch (e: any) {
@@ -84,7 +86,7 @@ export default function ChatPanel() {
       <div className="text-sm font-medium mb-2">Chat</div>
 
       <div className="flex-1 overflow-auto space-y-2 pr-1">
-        {log.map((m, i) => (
+        {chatLog.map((m, i) => (
           <div
             key={i}
             className={`rounded-xl px-3 py-2 text-sm ${

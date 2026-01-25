@@ -6,10 +6,11 @@ import { snapPoint } from "@/lib/geometry/snap";
 import { validateActions } from "@/lib/ai/actions";
 import type { ProposedPlan } from "@/lib/ai/planSchema";
 
+type Msg = { role: "user" | "assistant"; text: string };
+
 type Actions = {
   setRoom: (width: number, depth: number, unit?: RoomState["room"]["unit"]) => void;
   setGridSize: (gridSize: number) => void;
-
   addItem: (type: FurnitureType) => void;
   addItemWithSpec: (spec: {
     type: FurnitureType;
@@ -31,8 +32,11 @@ type Actions = {
   // AI
   setAiPlan: (plan: ProposedPlan | null) => void;
   applyPlan: (plan: ProposedPlan) => { ok: true } | { ok: false; reason: string };
+  aiPlan: ProposedPlan | null;
   previewItems: Item[] | null;
   setPreviewItems: (items: Item[] | null) => void;
+  chatLog: Msg[];
+  setChatLog: (log: Msg[]) => void;
 };
 
 const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string }> = {
@@ -60,8 +64,17 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
   selectedItemId: null,
   gridSize: 0.5,
 
+  // Chat
+  chatLog: [
+    {
+      role: "assistant",
+      text: "Tell me what you want to design (cozy, modern, movie night, desk setup, etc).",
+    },
+  ],
+  setChatLog: (log) => set((s) => ({ ...s, chatLog: log })),
+
   // AI
-  aiPlan: null,
+  aiPlan: null as ProposedPlan | null,
   setAiPlan: (plan) => set((s) => ({ ...s, aiPlan: plan })),
 
   previewItems: null,
@@ -144,9 +157,9 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
       }
     }
     set((s) => ({
-    ...s,
-    previewItems: null,
-    aiPlan: null,
+      ...s,
+      previewItems: null,
+      aiPlan: null,
     }));
     return { ok: true as const };
   },
