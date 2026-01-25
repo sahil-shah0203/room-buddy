@@ -1,5 +1,5 @@
 import type { RoomState, Item, FurnitureType } from "@/types/room";
-import { clampToRoom, rectsOverlap } from "@/lib/geometry/collision";
+import { clampToRoom, rectsOverlap, isValidPlacement } from "@/lib/geometry/collision";
 import { nanoid } from "nanoid";
 import type { ProposedPlan } from "@/lib/ai/planSchema";
 
@@ -30,6 +30,12 @@ export function validateActions(state: RoomState, actions: ProposedPlan["actions
         y: a.y ?? 0,
         rotation: a.rotation ?? 0,
       });
+
+      // Check if placement is valid within the room shape (polygon-aware)
+      if (!isValidPlacement(state.room, candidate)) {
+        return { ok: false, reason: `Item placement is outside the room bounds or crosses a wall.` };
+      }
+
       items.push(candidate);
     }
 
@@ -38,6 +44,12 @@ export function validateActions(state: RoomState, actions: ProposedPlan["actions
       const it = m.get(a.id);
       if (!it) return { ok: false, reason: `Unknown item id: ${a.id}` };
       const moved = clampToRoom(state.room, { ...it, x: a.x, y: a.y });
+
+      // Check if placement is valid within the room shape (polygon-aware)
+      if (!isValidPlacement(state.room, moved)) {
+        return { ok: false, reason: `Move would place item outside the room bounds or across a wall.` };
+      }
+
       items = items.map((x) => (x.id === a.id ? moved : x));
     }
 
@@ -48,6 +60,12 @@ export function validateActions(state: RoomState, actions: ProposedPlan["actions
       const nextRot = (((it.rotation + 90) % 360) as 0 | 90 | 180 | 270);
       const swapped = nextRot === 90 || nextRot === 270 ? { w: it.d, d: it.w } : { w: it.w, d: it.d };
       const rotated = clampToRoom(state.room, { ...it, ...swapped, rotation: nextRot });
+
+      // Check if placement is valid within the room shape (polygon-aware)
+      if (!isValidPlacement(state.room, rotated)) {
+        return { ok: false, reason: `Rotation would place item outside the room bounds or across a wall.` };
+      }
+
       items = items.map((x) => (x.id === a.id ? rotated : x));
     }
 

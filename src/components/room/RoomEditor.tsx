@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import RoomCanvas from "./RoomCanvas";
 import Toolbar from "./Toolbar";
 import PropertiesPanel from "./PropertiesPanel";
@@ -9,7 +10,21 @@ import SuggestionsTray from "@/components/ai/SuggestionsTray";
 import { useRoomStore } from "@/store/roomStore";
 import { isTypingInInput } from "@/lib/ui/keyboard";
 
+// Dynamic import for 3D view to avoid SSR issues with Three.js
+const Room3DView = dynamic(() => import("./Room3DView"), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-2xl border bg-gray-100 shadow-sm flex items-center justify-center" style={{ height: 640 }}>
+      <div className="text-gray-500">Loading 3D view...</div>
+    </div>
+  ),
+});
+
+type ViewMode = "2d" | "3d";
+
 export default function RoomEditor() {
+  const [viewMode, setViewMode] = useState<ViewMode>("2d");
+
   // ---- Stable Zustand selectors (NO object literals) ----
   const selectedItemId = useRoomStore((s) => s.selectedItemId);
   const removeSelected = useRoomStore((s) => s.removeSelected);
@@ -69,8 +84,32 @@ export default function RoomEditor() {
       <div className="space-y-4">
         <Toolbar />
 
+        {/* View mode toggle */}
+        <div className="flex gap-2">
+          <button
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              viewMode === "2d"
+                ? "bg-gray-900 text-white"
+                : "border bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+            onClick={() => setViewMode("2d")}
+          >
+            2D View
+          </button>
+          <button
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              viewMode === "3d"
+                ? "bg-gray-900 text-white"
+                : "border bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+            onClick={() => setViewMode("3d")}
+          >
+            3D View
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
-          <RoomCanvas />
+          {viewMode === "2d" ? <RoomCanvas /> : <Room3DView />}
           <PropertiesPanel />
         </div>
       </div>

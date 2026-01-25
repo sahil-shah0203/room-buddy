@@ -13,9 +13,11 @@ export default function ChatPanel() {
   const items = useRoomStore((s) => s.items);
   const gridSize = useRoomStore((s) => s.gridSize);
   const selectedItemId = useRoomStore((s) => s.selectedItemId);
+  const selectedVertexId = useRoomStore((s) => s.selectedVertexId);
+  const editMode = useRoomStore((s) => s.editMode);
 
   // Construct snapshot OUTSIDE the selector to keep it stable
-  const roomState = { room, items, gridSize, selectedItemId };
+  const roomState = { room, items, gridSize, selectedItemId, selectedVertexId, editMode, aiPlan: null };
 
   // ---- Local state ----
   const [log, setLog] = useState<Msg[]>([
