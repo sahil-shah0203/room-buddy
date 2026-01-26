@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
 import type { Item, RoomState, FurnitureType } from "@/types/room";
-import { clampToRoom, rectsOverlap } from "@/lib/geometry/collision";
+import { clampToRoom, rectsOverlap, blocksOverlap } from "@/lib/geometry/collision";
 import { snapPoint } from "@/lib/geometry/snap";
-import { validateActions } from "@/lib/ai/actions";
+import { validateActions, type ValidationIssue } from "@/lib/ai/actions";
 import type { ProposedPlan } from "@/lib/ai/planSchema";
 
 type Msg = { role: "user" | "assistant"; text: string };
@@ -31,12 +31,24 @@ type Actions = {
 
   // AI
   setAiPlan: (plan: ProposedPlan | null) => void;
-  applyPlan: (plan: ProposedPlan) => { ok: true } | { ok: false; reason: string };
+  applyPlan: (plan: ProposedPlan) => { ok: true } | { ok: false; reason: string; issues?: ValidationIssue[] };
   aiPlan: ProposedPlan | null;
   previewItems: Item[] | null;
   setPreviewItems: (items: Item[] | null) => void;
+
+  lastPlanValidation: { reason: string; issues: ValidationIssue[] } | null;
+  clearLastPlanValidation: () => void;
+
   chatLog: Msg[];
   setChatLog: (log: Msg[]) => void;
+
+  addDoor: (door?: Partial<Omit<import("@/types/room").Door, "id">>) => void;
+  updateDoor: (id: string, patch: Partial<Omit<import("@/types/room").Door, "id">>) => void;
+  removeDoor: (id: string) => void;
+
+  addWindow: (win?: Partial<Omit<import("@/types/room").Window, "id">>) => void;
+  updateWindow: (id: string, patch: Partial<Omit<import("@/types/room").Window, "id">>) => void;
+  removeWindow: (id: string) => void;
 };
 
 const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string }> = {
@@ -53,7 +65,7 @@ const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string
 function wouldCollide(state: RoomState, candidate: Item): boolean {
   for (const it of state.items) {
     if (it.id === candidate.id) continue;
-    if (rectsOverlap(it, candidate)) return true;
+    if (blocksOverlap(it, candidate)) return true;
   }
   return false;
 }
@@ -63,6 +75,7 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
   items: [],
   selectedItemId: null,
   gridSize: 0.5,
+  features: { doors: [], windows: [] },
 
   // Chat
   chatLog: [
@@ -78,9 +91,10 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
   setAiPlan: (plan) => set((s) => ({ ...s, aiPlan: plan })),
 
   previewItems: null,
+  setPreviewItems: (items) => set((s) => ({ ...s, previewItems: items })),
 
-    setPreviewItems: (items) =>
-    set((s) => ({ ...s, previewItems: items })),
+  lastPlanValidation: null,
+  clearLastPlanValidation: () => set((s) => ({ ...s, lastPlanValidation: null })),
 
   addItemWithSpec: (spec) => {
     const s = get();
@@ -88,65 +102,73 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const id = nanoid();
 
     let candidate: Item = {
-        id,
-        type: spec.type,
-        label: spec.label ?? base.label,
-        w: spec.w ?? base.w,
-        d: spec.d ?? base.d,
-        x: spec.x ?? 0.5,
-        y: spec.y ?? 0.5,
-        rotation: spec.rotation ?? 0,
+      id,
+      type: spec.type,
+      label: spec.label ?? base.label,
+      w: spec.w ?? base.w,
+      d: spec.d ?? base.d,
+      x: spec.x ?? 0.5,
+      y: spec.y ?? 0.5,
+      rotation: spec.rotation ?? 0,
     };
 
-    // keep inside room
     candidate = clampToRoom(s.room, candidate);
 
-    // v1 rule: if it collides, try nudging it around to find a valid spot
     let tries = 0;
     while (tries < 200 && wouldCollide(s, candidate)) {
-        candidate = { ...candidate, x: candidate.x + s.gridSize };
-        candidate = clampToRoom(s.room, candidate);
-        tries++;
-        if (candidate.x >= s.room.width - candidate.w) {
+      candidate = { ...candidate, x: candidate.x + s.gridSize };
+      candidate = clampToRoom(s.room, candidate);
+      tries++;
+      if (candidate.x >= s.room.width - candidate.w) {
         candidate = { ...candidate, x: 0.5, y: candidate.y + s.gridSize };
         candidate = clampToRoom(s.room, candidate);
-        }
+      }
     }
 
-    // If we never found a spot, don't place it
     if (wouldCollide(s, candidate)) return "";
 
     set((prev) => ({
-        ...prev,
-        items: [...prev.items, candidate],
-        selectedItemId: id,
+      ...prev,
+      items: [...prev.items, candidate],
+      selectedItemId: id,
     }));
 
     return id;
-    },
+  },
 
   applyPlan: (plan) => {
     const state = get();
     const v = validateActions(state, plan.actions);
 
-    if (!v.ok) return { ok: false as const, reason: v.reason };
+    if (!v.ok) {
+      set((s) => ({
+        ...s,
+        lastPlanValidation: { reason: v.reason, issues: v.issues },
+      }));
+      return { ok: false as const, reason: v.reason, issues: v.issues };
+    }
 
     // Apply in order using existing store methods so behavior stays consistent.
-    // NOTE: v1: ADD_ITEM ignores x/y/w/d because addItem() uses defaults.
-    // Next step: addItemWithSpec() so AI can place exactly.
     for (const a of plan.actions) {
       if (a.kind === "ADD_ITEM") {
         const newId = get().addItemWithSpec({
-            type: a.type,
-            w: a.w,
-            d: a.d,
-            x: a.x,
-            y: a.y,
-            rotation: a.rotation,
-            label: a.label,
+          type: a.type,
+          w: a.w,
+          d: a.d,
+          x: a.x,
+          y: a.y,
+          rotation: a.rotation,
+          label: a.label,
         });
 
-        if (!newId) return { ok: false as const, reason: "Could not place an item without collisions." };
+        if (!newId) {
+          const reason = "Could not place an item without collisions.";
+          set((s) => ({
+            ...s,
+            lastPlanValidation: { reason, issues: [] },
+          }));
+          return { ok: false as const, reason, issues: [] };
+        }
       } else if (a.kind === "MOVE_ITEM") {
         get().moveItem(a.id, a.x, a.y, { snap: true });
       } else if (a.kind === "ROTATE_ITEM") {
@@ -156,11 +178,14 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
         get().removeSelected();
       }
     }
+
     set((s) => ({
       ...s,
       previewItems: null,
       aiPlan: null,
+      lastPlanValidation: null,
     }));
+
     return { ok: true as const };
   },
 
@@ -171,6 +196,77 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     })),
 
   setGridSize: (gridSize) => set((s) => ({ ...s, gridSize: Math.max(0.1, gridSize) })),
+
+  addDoor: (door) =>
+    set((s) => ({
+      ...s,
+      features: {
+        ...s.features,
+        doors: [
+          ...s.features.doors,
+          {
+            id: nanoid(),
+            wall: door?.wall ?? "bottom",
+            offset: door?.offset ?? 1,
+            width: door?.width ?? 3,
+            swing: door?.swing ?? "in_left",
+          },
+        ],
+      },
+    })),
+
+  updateDoor: (id, patch) =>
+    set((s) => ({
+      ...s,
+      features: {
+        ...s.features,
+        doors: s.features.doors.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+      },
+    })),
+
+  removeDoor: (id) =>
+    set((s) => ({
+      ...s,
+      features: {
+        ...s.features,
+        doors: s.features.doors.filter((d) => d.id !== id),
+      },
+    })),
+
+  addWindow: (win) =>
+    set((s) => ({
+      ...s,
+      features: {
+        ...s.features,
+        windows: [
+          ...s.features.windows,
+          {
+            id: nanoid(),
+            wall: win?.wall ?? "top",
+            offset: win?.offset ?? 2,
+            width: win?.width ?? 4,
+          },
+        ],
+      },
+    })),
+
+  updateWindow: (id, patch) =>
+    set((s) => ({
+      ...s,
+      features: {
+        ...s.features,
+        windows: s.features.windows.map((w) => (w.id === id ? { ...w, ...patch } : w)),
+      },
+    })),
+
+  removeWindow: (id) =>
+    set((s) => ({
+      ...s,
+      features: {
+        ...s.features,
+        windows: s.features.windows.filter((w) => w.id !== id),
+      },
+    })),
 
   addItem: (type) => {
     const s = get();
@@ -230,7 +326,7 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const moved = nextItems.find((it) => it.id === id);
     if (!moved) return;
 
-    const collides = nextItems.some((it) => it.id !== id && rectsOverlap(it, moved));
+    const collides = nextItems.some((it) => it.id !== id && blocksOverlap(it, moved));
     if (collides) return;
 
     set((prev) => ({ ...prev, items: nextItems }));
@@ -249,7 +345,7 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const rotated = next.find((it) => it.id === id);
     if (!rotated) return;
 
-    const collides = next.some((it) => it.id !== id && rectsOverlap(it, rotated));
+    const collides = next.some((it) => it.id !== id && blocksOverlap(it, rotated));
     if (collides) return;
 
     set((prev) => ({ ...prev, items: next }));
@@ -266,7 +362,7 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const resized = next.find((it) => it.id === id);
     if (!resized) return;
 
-    const collides = next.some((it) => it.id !== id && rectsOverlap(it, resized));
+    const collides = next.some((it) => it.id !== id && blocksOverlap(it, resized));
     if (collides) return;
 
     set((prev) => ({ ...prev, items: next }));

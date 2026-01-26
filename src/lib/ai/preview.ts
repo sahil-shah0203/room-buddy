@@ -1,6 +1,6 @@
 import type { Item, RoomState } from "@/types/room";
 import type { ProposedPlan } from "@/lib/ai/planSchema";
-import { clampToRoom, rectsOverlap } from "@/lib/geometry/collision";
+import { clampToRoom, rectsOverlap, blocksOverlap } from "@/lib/geometry/collision";
 
 export function derivePreviewItems(
   state: RoomState,
@@ -8,18 +8,29 @@ export function derivePreviewItems(
 ): Item[] {
   let items = structuredClone(state.items);
 
+  function dimsForRotation(w: number, d: number, rotation: 0 | 90 | 180 | 270) {
+    return rotation === 90 || rotation === 270 ? { w: d, d: w } : { w, d };
+  }
+
   for (const action of plan.actions) {
     if (action.kind === "ADD_ITEM") {
-      items.push({
-        id: "preview-" + Math.random().toString(36).slice(2),
-        type: action.type,
-        label: action.label ?? action.type,
-        w: action.w ?? 2,
-        d: action.d ?? 2,
-        x: action.x ?? 0,
-        y: action.y ?? 0,
-        rotation: action.rotation ?? 0,
-      });
+      const rotation = action.rotation ?? 0;
+      const baseW = action.w ?? 2;
+      const baseD = action.d ?? 2;
+      const dims = dimsForRotation(baseW, baseD, rotation);
+
+      items.push(
+        clampToRoom(state.room, {
+          id: "preview-" + Math.random().toString(36).slice(2),
+          type: action.type,
+          label: action.label ?? action.type,
+          w: dims.w,
+          d: dims.d,
+          x: action.x ?? 0,
+          y: action.y ?? 0,
+          rotation,
+        })
+      );
     }
 
     if (action.kind === "MOVE_ITEM") {

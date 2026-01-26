@@ -39,7 +39,13 @@ const RemoveItem = z.object({
   id: z.string(),
 });
 
-export const ActionSchema = z.union([AddItem, MoveItem, RotateItem, RemoveItem]);
+const SetRotation = z.object({
+  kind: z.literal("SET_ROTATION"),
+  id: z.string(),
+  rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
+});
+
+export const ActionSchema = z.union([AddItem, MoveItem, RotateItem, RemoveItem, SetRotation]);
 
 export const ProposedPlanSchema = z.object({
   summary: z.string(),

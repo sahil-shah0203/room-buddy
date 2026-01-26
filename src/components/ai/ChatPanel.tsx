@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
 
 type Msg = { role: "user" | "assistant"; text: string };
@@ -11,25 +11,30 @@ export default function ChatPanel() {
 
   const room = useRoomStore((s) => s.room);
   const items = useRoomStore((s) => s.items);
+  const features = useRoomStore((s) => s.features);
   const gridSize = useRoomStore((s) => s.gridSize);
   const selectedItemId = useRoomStore((s) => s.selectedItemId);
 
-  // Construct snapshot OUTSIDE the selector to keep it stable
-  const roomState = { room, items, gridSize, selectedItemId };
-
-  // ---- Local state ----
   const chatLog = useRoomStore((s) => s.chatLog);
   const setChatLog = useRoomStore((s) => s.setChatLog);
+
+  // Stable snapshot (memoized)
+  const roomState = useMemo(
+    () => ({ room, items, features, gridSize, selectedItemId }),
+    [room, items, features, gridSize, selectedItemId]
+  );
+
+  // ---- Local state ----
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ---- Send message to AI ----
+  // ---- Intent heuristic ----
   function shouldPlan(text: string) {
-    return /(add|place|move|rotate|remove|layout|design|decorate|cozy|modern|minimal|rug|sofa|bed|desk|chair|table|tv)/i.test(
-      text
-    );
-  }
+  return /(add|place|move|rotate|remove|layout|design|decorate|cozy|modern|minimal|rug|sofa|bed|desk|chair|table|tv|stand|dresser|try again|redo|another option|different layout|make it fit|fix overlap|adjust layout)/i.test(
+    text
+  );
+}
 
   async function send() {
     const text = input.trim();
@@ -48,7 +53,11 @@ export default function ChatPanel() {
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, messages: nextLog, roomState }),
+        body: JSON.stringify({
+          mode,
+          messages: nextLog,
+          roomState, // ✅ now includes features (doors/windows)
+        }),
       });
 
       const data = await res.json();
@@ -87,12 +96,7 @@ export default function ChatPanel() {
 
       <div className="flex-1 overflow-auto space-y-2 pr-1">
         {chatLog.map((m, i) => (
-          <div
-            key={i}
-            className={`rounded-xl px-3 py-2 text-sm ${
-              m.role === "user" ? "border" : "bg-black/5"
-            }`}
-          >
+          <div key={i} className={`rounded-xl px-3 py-2 text-sm ${m.role === "user" ? "border" : "bg-black/5"}`}>
             {m.text}
           </div>
         ))}
@@ -109,11 +113,7 @@ export default function ChatPanel() {
           placeholder={loading ? "Thinking…" : "Describe your room or vibe"}
           disabled={loading}
         />
-        <button
-          className="rounded-xl border px-3 py-2 text-sm"
-          onClick={send}
-          disabled={loading}
-        >
+        <button className="rounded-xl border px-3 py-2 text-sm" onClick={send} disabled={loading}>
           {loading ? "…" : "Send"}
         </button>
       </div>

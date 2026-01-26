@@ -3,7 +3,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
 import type { Item } from "@/types/room";
-import { rectsOverlap } from "@/lib/geometry/collision";
+import { clampToRoom, rectsOverlap, blocksOverlap } from "@/lib/geometry/collision";
 
 type DragState =
   | { type: "none" }
@@ -26,6 +26,7 @@ export default function RoomCanvas() {
   const previewItems = useRoomStore((s) => s.previewItems);
   const selectedItemId = useRoomStore((s) => s.selectedItemId);
   const gridSize = useRoomStore((s) => s.gridSize);
+  const features = useRoomStore((s) => s.features);
 
   const selectItem = useRoomStore((s) => s.selectItem);
   const moveItem = useRoomStore((s) => s.moveItem);
@@ -47,6 +48,34 @@ export default function RoomCanvas() {
   }
   function pxToRoom(v: number) {
     return v / scale;
+  }
+
+  function wallPoint(wall: "top" | "right" | "bottom" | "left", offset: number) {
+    // offset measured along the wall, in room units (ft)
+    switch (wall) {
+      case "top":
+        return { x: offset, y: 0 };
+      case "bottom":
+        return { x: offset, y: room.depth };
+      case "left":
+        return { x: 0, y: offset };
+      case "right":
+        return { x: room.width, y: offset };
+    }
+  }
+
+  function wallSegment(
+    wall: "top" | "right" | "bottom" | "left",
+    offset: number,
+    length: number
+  ) {
+    const p = wallPoint(wall, offset);
+    const horizontal = wall === "top" || wall === "bottom";
+    const x1 = p.x;
+    const y1 = p.y;
+    const x2 = horizontal ? p.x + length : p.x;
+    const y2 = horizontal ? p.y : p.y + length;
+    return { x1, y1, x2, y2 };
   }
 
   const gridLines = useMemo(() => {
@@ -140,6 +169,46 @@ export default function RoomCanvas() {
             stroke="currentColor"
             strokeWidth={2}
           />
+          {/* --- DOORS / WINDOWS (constraints layer) --- */}
+            {features && (
+              <g>
+                {/* Doors */}
+                {features.doors.map((d) => {
+                  const seg = wallSegment(d.wall, d.offset, d.width);
+                  return (
+                    <line
+                      key={d.id}
+                      x1={roomToPx(seg.x1)}
+                      y1={roomToPx(seg.y1)}
+                      x2={roomToPx(seg.x2)}
+                      y2={roomToPx(seg.y2)}
+                      stroke="currentColor"
+                      strokeWidth={5}
+                      strokeLinecap="round"
+                      opacity={0.85}
+                    />
+                  );
+                })}
+
+                {/* Windows */}
+                {features.windows.map((w) => {
+                  const seg = wallSegment(w.wall, w.offset, w.width);
+                  return (
+                    <line
+                      key={w.id}
+                      x1={roomToPx(seg.x1)}
+                      y1={roomToPx(seg.y1)}
+                      x2={roomToPx(seg.x2)}
+                      y2={roomToPx(seg.y2)}
+                      stroke="#3b82f6"
+                      strokeWidth={5}
+                      strokeLinecap="round"
+                      opacity={0.9}
+                    />
+                  );
+                })}
+              </g>
+            )}
 
           {/* --- GHOST PREVIEW LAYER --- */}
           {previewItems && previewItems.length > 0 && (

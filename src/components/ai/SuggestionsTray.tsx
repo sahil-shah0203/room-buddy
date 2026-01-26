@@ -13,18 +13,20 @@ export default function SuggestionsTray() {
   const room = useRoomStore((s) => s.room);
   const items = useRoomStore((s) => s.items);
 
-  const [error, setError] = useState<string | null>(null);
-  const [loadingAlt, setLoadingAlt] = useState(false);
+  const lastPlanValidation = useRoomStore((s) => s.lastPlanValidation);
+  const clearLastPlanValidation = useRoomStore((s) => s.clearLastPlanValidation);
 
-  const chatLog = useRoomStore((s) => s.chatLog);
+  const [error, setError] = useState<string | null>(null);
 
   // Build preview whenever we get a plan
   useEffect(() => {
     if (!aiPlan) {
       setPreviewItems(null);
       setError(null);
+      clearLastPlanValidation();
       return;
     }
+
     try {
       const preview = derivePreviewItems({ room, items } as any, aiPlan);
       setPreviewItems(preview);
@@ -33,53 +35,29 @@ export default function SuggestionsTray() {
       setPreviewItems(null);
       setError("Could not generate preview.");
     }
-  }, [aiPlan, room, items, setPreviewItems]);
-
-  async function requestAlternative(hint: string) {
-    setLoadingAlt(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "plan",
-          messages: chatLog,
-          roomState: { room, items },
-          hint,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error ?? "AI error");
-        return;
-      }
-
-      setAiPlan(data);
-    } catch (e: any) {
-      setError(e?.message ?? "Network error");
-    } finally {
-      setLoadingAlt(false);
-    }
-  }
+  }, [aiPlan, room, items, setPreviewItems, clearLastPlanValidation]);
 
   function onApply() {
     if (!aiPlan) return;
+
     const res = applyPlan(aiPlan);
     if (!res.ok) {
       setError(res.reason);
       return;
     }
+
     setError(null);
-    // store.applyPlan already clears aiPlan + previewItems in your code, which is perfect
+    // store.applyPlan clears aiPlan + previewItems (perfect)
   }
 
   function onDismiss() {
     setAiPlan(null);
     setPreviewItems(null);
     setError(null);
+    clearLastPlanValidation();
   }
+
+  const issues = lastPlanValidation?.issues ?? [];
 
   return (
     <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
@@ -101,36 +79,26 @@ export default function SuggestionsTray() {
 
           <div className="text-xs opacity-70">{aiPlan.actions.length} proposed changes</div>
 
+          {issues.length > 0 && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-1">
+              <div className="text-xs font-medium text-red-700">Apply failed because:</div>
+              <ul className="text-xs text-red-700 list-disc pl-5 space-y-1">
+                {issues.slice(0, 4).map((iss, idx) => (
+                  <li key={idx}>{iss.message}</li>
+                ))}
+              </ul>
+              {issues.length > 4 && <div className="text-[11px] text-red-600">+{issues.length - 4} more</div>}
+              <div className="text-[11px] text-red-700 opacity-90 pt-1">
+                Fix it via chat (e.g. “try a different layout”, “more spacing”, “rotate the sofa”, “don’t block the
+                door”, “move TV to the top wall”).
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-2">
             <button className="w-full rounded-xl border px-3 py-2 text-sm" onClick={onApply}>
               Apply changes
             </button>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                className="rounded-xl border px-3 py-2 text-sm"
-                disabled={loadingAlt}
-                onClick={() =>
-                  requestAlternative(
-                    "Try again with a different layout. Avoid overlaps. Use fewer items if needed. Prefer smaller furniture and more spacing."
-                  )
-                }
-              >
-                {loadingAlt ? "…" : "Try again"}
-              </button>
-
-              <button
-                className="rounded-xl border px-3 py-2 text-sm"
-                disabled={loadingAlt}
-                onClick={() =>
-                  requestAlternative(
-                    "Make it fit at all costs. Avoid overlaps. If needed, REMOVE up to 2 existing items that block the layout, and explain why in reasons."
-                  )
-                }
-              >
-                {loadingAlt ? "…" : "Make it fit"}
-              </button>
-            </div>
 
             <button className="w-full rounded-xl border px-3 py-2 text-sm" onClick={onDismiss}>
               Dismiss
