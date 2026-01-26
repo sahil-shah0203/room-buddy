@@ -2,9 +2,9 @@
 
 import React, { useRef, useState, useMemo, useEffect } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
-import { OrbitControls, ContactShadows, PerspectiveCamera, RoundedBox } from "@react-three/drei";
+import { ContactShadows, PerspectiveCamera, RoundedBox } from "@react-three/drei";
 import { useRoomStore } from "@/store/roomStore";
-import type { Item, FurnitureType, WallOpening, FloorType, RoomAppearance } from "@/types/room";
+import type { Item, FurnitureType, WallOpening, FloorType, RoomAppearance, CeilingItem } from "@/types/room";
 import { getBoundingBox } from "@/lib/geometry/polygon";
 import * as THREE from "three";
 
@@ -310,6 +310,105 @@ function RugModel({ w, d, color }: { w: number; d: number; color: string }) {
   );
 }
 
+// Ceiling light fixture
+function CeilingLightModel({ item }: { item: CeilingItem }) {
+  const fixtureHeight = 0.3;
+  const radius = item.size / 2;
+
+  return (
+    <group position={[item.x, WALL_HEIGHT - fixtureHeight / 2, item.y]}>
+      {/* Fixture base (flush with ceiling) */}
+      <mesh>
+        <cylinderGeometry args={[radius * 0.3, radius * 0.4, 0.1, 32]} />
+        <meshStandardMaterial color="#e0e0e0" roughness={0.5} metalness={0.3} />
+      </mesh>
+
+      {/* Light dome/shade */}
+      <mesh position={[0, -0.15, 0]}>
+        <cylinderGeometry args={[radius, radius * 0.8, fixtureHeight, 32]} />
+        <meshStandardMaterial
+          color="#ffffff"
+          emissive={item.isOn ? item.lightColor : "#000000"}
+          emissiveIntensity={item.isOn ? 0.5 : 0}
+          roughness={0.3}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+
+      {/* Inner glow when on */}
+      {item.isOn && (
+        <mesh position={[0, -0.2, 0]}>
+          <sphereGeometry args={[radius * 0.5, 16, 16]} />
+          <meshBasicMaterial color={item.lightColor} transparent opacity={0.6} />
+        </mesh>
+      )}
+
+      {/* Actual point light */}
+      {item.isOn && (
+        <pointLight
+          position={[0, -0.5, 0]}
+          intensity={item.lightIntensity * 3}
+          color={item.lightColor}
+          castShadow
+          distance={30}
+          decay={1.2}
+          shadow-mapSize={[1024, 1024]}
+          shadow-bias={-0.002}
+          shadow-radius={4}
+        />
+      )}
+    </group>
+  );
+}
+
+// Ceiling fan (no light)
+function CeilingFanModel({ item }: { item: CeilingItem }) {
+  const hubRadius = 0.3;
+  const bladeLength = item.size / 2 - hubRadius;
+  const bladeWidth = 0.4;
+  const dropHeight = 0.8;
+
+  return (
+    <group position={[item.x, WALL_HEIGHT - dropHeight, item.y]}>
+      {/* Mounting rod */}
+      <mesh castShadow>
+        <cylinderGeometry args={[0.05, 0.05, dropHeight, 8]} />
+        <meshStandardMaterial color="#555555" roughness={0.4} metalness={0.6} />
+      </mesh>
+
+      {/* Motor housing */}
+      <mesh position={[0, -dropHeight / 2, 0]} castShadow>
+        <cylinderGeometry args={[hubRadius, hubRadius * 0.8, 0.4, 32]} />
+        <meshStandardMaterial color="#333333" roughness={0.3} metalness={0.7} />
+      </mesh>
+
+      {/* Fan blades (5 blades) */}
+      {[0, 72, 144, 216, 288].map((angle, i) => (
+        <mesh
+          key={i}
+          position={[
+            Math.cos((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
+            -dropHeight / 2 - 0.1,
+            Math.sin((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
+          ]}
+          rotation={[0, (-angle * Math.PI) / 180, 0]}
+          castShadow
+        >
+          <boxGeometry args={[bladeLength, 0.05, bladeWidth]} />
+          <meshStandardMaterial color="#8B4513" roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* Bottom cap */}
+      <mesh position={[0, -dropHeight / 2 - 0.25, 0]} castShadow>
+        <sphereGeometry args={[0.15, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#333333" roughness={0.3} metalness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
 function FurnitureItem3D({
   item,
   isSelected,
@@ -545,43 +644,92 @@ function Outdoor3D({ roomCenter }: { roomCenter: [number, number] }) {
   );
 }
 
-// Keyboard controls for first-person movement
-function KeyboardControls({ speed = 0.15 }: { speed?: number }) {
-  const { camera } = useThree();
+// First-person controls - WASD movement + mouse look
+function FirstPersonControls({ speed = 0.15 }: { speed?: number }) {
+  const { camera, gl } = useThree();
   const keys = useRef<Set<string>>(new Set());
+  const isMouseDown = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
+  const rotation = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
+    // Initialize rotation from camera
+    rotation.current.y = camera.rotation.y;
+    rotation.current.x = camera.rotation.x;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       keys.current.add(e.key.toLowerCase());
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       keys.current.delete(e.key.toLowerCase());
     };
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 0 || e.button === 2) {
+        isMouseDown.current = true;
+        lastMouse.current = { x: e.clientX, y: e.clientY };
+      }
+    };
+    const handleMouseUp = () => {
+      isMouseDown.current = false;
+    };
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isMouseDown.current) return;
 
+      const deltaX = e.clientX - lastMouse.current.x;
+      const deltaY = e.clientY - lastMouse.current.y;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+
+      // Rotate camera
+      rotation.current.y -= deltaX * 0.003;
+      rotation.current.x -= deltaY * 0.003;
+      // Clamp vertical rotation
+      rotation.current.x = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, rotation.current.x));
+    };
+    const handleContextMenu = (e: Event) => {
+      e.preventDefault();
+    };
+
+    const canvas = gl.domElement;
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    canvas.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, []);
+  }, [gl, camera]);
 
   useFrame(() => {
-    const direction = new THREE.Vector3();
-    camera.getWorldDirection(direction);
-    direction.y = 0;
-    direction.normalize();
+    // Apply rotation
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = rotation.current.y;
+    camera.rotation.x = rotation.current.x;
 
-    const right = new THREE.Vector3();
-    right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+    // Calculate movement direction based on camera facing
+    const forward = new THREE.Vector3(0, 0, -1);
+    forward.applyQuaternion(camera.quaternion);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3(1, 0, 0);
+    right.applyQuaternion(camera.quaternion);
+    right.y = 0;
+    right.normalize();
 
     // WASD movement
     if (keys.current.has('w') || keys.current.has('arrowup')) {
-      camera.position.addScaledVector(direction, speed);
+      camera.position.addScaledVector(forward, speed);
     }
     if (keys.current.has('s') || keys.current.has('arrowdown')) {
-      camera.position.addScaledVector(direction, -speed);
+      camera.position.addScaledVector(forward, -speed);
     }
     if (keys.current.has('a') || keys.current.has('arrowleft')) {
       camera.position.addScaledVector(right, -speed);
@@ -711,6 +859,43 @@ function WallWithOpenings({
     return segments;
   }, [length, height, wallOpenings]);
 
+  // Calculate baseboard segments - skip doors
+  const baseboardSegments = useMemo(() => {
+    // Get door openings only
+    const floorOpenings = wallOpenings
+      .filter(o => o.type === "door")
+      .sort((a, b) => a.position - b.position);
+
+    if (floorOpenings.length === 0) {
+      // No doors - full baseboard
+      return [{ start: 0, end: length }];
+    }
+
+    const segments: { start: number; end: number }[] = [];
+    let lastEnd = 0;
+
+    floorOpenings.forEach((opening) => {
+      const posAlongWall = opening.position * length;
+      const halfWidth = opening.width / 2;
+      const left = Math.max(0, posAlongWall - halfWidth);
+      const right = Math.min(length, posAlongWall + halfWidth);
+
+      // Segment before this door
+      if (left > lastEnd + 0.05) {
+        segments.push({ start: lastEnd, end: left });
+      }
+
+      lastEnd = right;
+    });
+
+    // Segment after the last door
+    if (lastEnd < length - 0.05) {
+      segments.push({ start: lastEnd, end: length });
+    }
+
+    return segments;
+  }, [length, wallOpenings]);
+
   return (
     <group>
       {/* Wall segments */}
@@ -738,14 +923,24 @@ function WallWithOpenings({
         );
       })}
 
-      {/* Baseboard */}
-      <mesh
-        position={[midX, 0.15, midZ]}
-        rotation={[0, -angle, 0]}
-      >
-        <boxGeometry args={[length + 0.1, 0.3, 0.35]} />
-        <meshStandardMaterial color={baseboardColor} roughness={0.7} metalness={0} />
-      </mesh>
+      {/* Baseboard segments - skip doors */}
+      {baseboardSegments.map((seg, idx) => {
+        const segLength = seg.end - seg.start;
+        const segCenterAlongWall = seg.start + segLength / 2;
+        const posX = start.x + Math.cos(angle) * segCenterAlongWall;
+        const posZ = start.y + Math.sin(angle) * segCenterAlongWall;
+
+        return (
+          <mesh
+            key={`baseboard-${idx}`}
+            position={[posX, 0.15, posZ]}
+            rotation={[0, -angle, 0]}
+          >
+            <boxGeometry args={[segLength + 0.1, 0.3, 0.35]} />
+            <meshStandardMaterial color={baseboardColor} roughness={0.7} metalness={0} />
+          </mesh>
+        );
+      })}
 
       {/* Window/door frames and details */}
       {wallOpenings.map((opening) => {
@@ -865,24 +1060,26 @@ function WallWithOpenings({
                   <boxGeometry args={[0.12, opening.height, 0.15]} />
                   <meshStandardMaterial color="#654321" roughness={0.7} />
                 </mesh>
-                {/* Door panel - slightly ajar to show it's a door */}
+                {/* Door panel - closed, fills the full opening */}
                 <mesh
                   position={[
-                    openingX + perpX * 0.2 - Math.cos(angle) * 0.15,
+                    openingX + perpX * 0.13,
                     opening.fromFloor + opening.height / 2,
-                    openingZ + perpZ * 0.2 - Math.sin(angle) * 0.15
+                    openingZ + perpZ * 0.13
                   ]}
-                  rotation={[0, -angle + 0.3, 0]}
+                  rotation={[0, -angle, 0]}
+                  castShadow
+                  receiveShadow
                 >
-                  <boxGeometry args={[opening.width - 0.2, opening.height - 0.1, 0.05]} />
+                  <boxGeometry args={[opening.width + 0.05, opening.height + 0.05, 0.12]} />
                   <meshStandardMaterial color="#8B4513" roughness={0.8} />
                 </mesh>
                 {/* Door handle */}
                 <mesh
                   position={[
-                    openingX + Math.cos(angle) * (opening.width / 2 - 0.5) + perpX * 0.24,
+                    openingX + Math.cos(angle) * (opening.width / 2 - 0.4) + perpX * 0.16,
                     opening.fromFloor + opening.height / 2 - 0.3,
-                    openingZ + Math.sin(angle) * (opening.width / 2 - 0.5) + perpZ * 0.24
+                    openingZ + Math.sin(angle) * (opening.width / 2 - 0.4) + perpZ * 0.16
                   ]}
                 >
                   <sphereGeometry args={[0.08, 16, 16]} />
@@ -942,15 +1139,15 @@ function Ceiling({ vertices, height = WALL_HEIGHT, ceilingColor }: { vertices: {
   }, [vertices]);
 
   return (
-    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, height, 0]}>
+    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, height, 0]} castShadow receiveShadow>
       <shapeGeometry args={[shape]} />
       <meshStandardMaterial color={ceilingColor} roughness={0.9} metalness={0} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-function RoomScene() {
-  const { room, items, selectedItemId, selectItem, moveItem, openings, appearance } = useRoomStore();
+function RoomScene({ fov }: { fov: number }) {
+  const { room, items, selectedItemId, selectItem, moveItem, openings, appearance, ceilingItems } = useRoomStore();
   const [isDragging, setIsDragging] = useState(false);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const { camera, raycaster, gl } = useThree();
@@ -1024,35 +1221,43 @@ function RoomScene() {
 
   return (
     <>
-      {/* Camera - positioned inside the room at eye level with wider FOV */}
+      {/* Camera - positioned inside the room at eye level */}
       <PerspectiveCamera
         makeDefault
         position={[bbox.width / 2, 5, bbox.depth * 0.85]}
-        fov={100}
+        fov={fov}
         near={0.1}
       />
 
-      {/* Keyboard controls for WASD movement */}
-      <KeyboardControls speed={0.2} />
+      {/* First-person controls: WASD movement + mouse drag to look */}
+      <FirstPersonControls speed={0.2} />
 
-      {/* Lighting - interior lighting setup */}
-      <ambientLight intensity={0.6} />
+      {/* Lighting - realistic interior setup */}
+      {/* Ambient light for general illumination */}
+      <ambientLight intensity={ceilingItems.some(c => c.isOn) ? 0.15 : 0.25} color="#b4c6e0" />
+
+      {/* Noon sun - directly above, casts shadows that respect solid structures */}
+      {/* Light passes through windows (transparent) but blocked by ceiling, walls, doors */}
       <directionalLight
-        position={[bbox.width / 2, 15, bbox.depth / 2]}
-        intensity={0.7}
+        position={[bbox.width / 2, 50, bbox.depth / 2]}
+        intensity={1.2}
+        color="#fffaf0"
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={40}
-        shadow-camera-left={-15}
-        shadow-camera-right={15}
-        shadow-camera-top={15}
-        shadow-camera-bottom={-15}
+        shadow-camera-far={100}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
         shadow-bias={-0.0001}
       />
-      {/* Fill lights from corners */}
-      <pointLight position={[1, 7, 1]} intensity={0.3} />
-      <pointLight position={[bbox.width - 1, 7, bbox.depth - 1]} intensity={0.3} />
-      <hemisphereLight args={["#ffeeb1", "#080820", 0.5]} />
+
+      {/* Sky/ground bounce light - subtle blue from sky, warm from floor */}
+      <hemisphereLight args={["#87ceeb", "#f5e6d3", ceilingItems.some(c => c.isOn) ? 0.2 : 0.4]} />
+
+      {/* Soft fill lights simulating indirect light (no shadows) */}
+      <pointLight position={[1, 3, 1]} intensity={0.08} color="#fff8f0" distance={15} decay={2} castShadow={false} />
+      <pointLight position={[bbox.width - 1, 3, bbox.depth - 1]} intensity={0.08} color="#fff8f0" distance={15} decay={2} castShadow={false} />
 
       {/* 3D Outdoor environment - visible through windows */}
       <Outdoor3D roomCenter={roomCenter} />
@@ -1096,6 +1301,15 @@ function RoomScene() {
         </group>
       ))}
 
+      {/* Ceiling items (lights and fans) */}
+      {ceilingItems.map((item) =>
+        item.type === "ceilingLight" ? (
+          <CeilingLightModel key={item.id} item={item} />
+        ) : (
+          <CeilingFanModel key={item.id} item={item} />
+        )
+      )}
+
       {/* Click on floor to deselect */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
@@ -1107,38 +1321,41 @@ function RoomScene() {
         <meshBasicMaterial />
       </mesh>
 
-      {/* Orbit controls - configured for first-person look-around */}
-      <OrbitControls
-        makeDefault
-        minPolarAngle={0.5}
-        maxPolarAngle={Math.PI - 0.5}
-        minDistance={0.1}
-        maxDistance={0.1}
-        target={[bbox.width / 2, 5, bbox.depth * 0.3]}
-        enabled={!isDragging}
-        enableDamping
-        dampingFactor={0.05}
-        enableZoom={false}
-        enablePan={true}
-        panSpeed={2}
-        rotateSpeed={0.5}
-      />
     </>
   );
 }
 
 export default function Room3DView() {
+  const [fov, setFov] = useState(90);
+
   return (
     <div className="rounded-2xl border bg-white p-5 shadow-sm select-none">
+      {/* Zoom slider */}
+      <div className="mb-3 flex items-center gap-3">
+        <span className="text-xs text-gray-500">Zoom:</span>
+        <input
+          type="range"
+          min="50"
+          max="120"
+          value={fov}
+          onChange={(e) => setFov(Number(e.target.value))}
+          className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+        />
+        <span className="text-xs text-gray-400 w-8">{fov}°</span>
+      </div>
       <Canvas
         shadows
-        gl={{ antialias: true }}
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.0,
+        }}
         dpr={[1, 2]}
         style={{ width: 640, height: 640, display: "block" }}
       >
         <color attach="background" args={["#87ceeb"]} />
-        <fog attach="fog" args={["#87ceeb", 20, 60]} />
-        <RoomScene />
+        <fog attach="fog" args={["#a8c8e8", 30, 80]} />
+        <RoomScene fov={fov} />
       </Canvas>
     </div>
   );

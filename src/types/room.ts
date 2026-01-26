@@ -39,7 +39,22 @@ export type Room = {
   unit: Unit;
 };
 
-export type EditMode = "furniture" | "shape";
+export type EditMode = "furniture" | "shape" | "ceiling";
+
+// Ceiling items (lights and fans)
+export type CeilingItemType = "ceilingLight" | "ceilingFan";
+
+export type CeilingItem = {
+  id: string;
+  type: CeilingItemType;
+  label?: string;
+  x: number;
+  y: number;
+  size: number;           // diameter in room units
+  lightColor: string;     // hex color
+  lightIntensity: number; // 0-1
+  isOn: boolean;
+};
 
 // Wall openings (windows and doors)
 export type OpeningType = "window" | "door";
@@ -83,10 +98,12 @@ export type RoomState = {
   room: Room;
   items: Item[];
   openings: WallOpening[];
+  ceilingItems: CeilingItem[];
   appearance: RoomAppearance;
   selectedItemId: string | null;
   selectedVertexId: string | null;
   selectedOpeningId: string | null;
+  selectedCeilingItemId: string | null;
   gridSize: number; // spacing in room units (e.g., 0.5 ft or 6 in)
   editMode: EditMode;
   aiPlan: import("@/lib/ai/planSchema").ProposedPlan | null;

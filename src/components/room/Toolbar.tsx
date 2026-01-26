@@ -11,6 +11,7 @@ export default function Toolbar() {
     editMode,
     selectedVertexId,
     selectedOpeningId,
+    selectedCeilingItemId,
     openings,
     setGridSize,
     addItem,
@@ -20,6 +21,8 @@ export default function Toolbar() {
     removeVertex,
     addOpening,
     removeOpening,
+    addCeilingItem,
+    removeCeilingItem,
   } = useRoomStore();
 
   const [selectedWall, setSelectedWall] = useState(0);
@@ -51,6 +54,16 @@ export default function Toolbar() {
           onClick={() => setEditMode("shape")}
         >
           Room Shape
+        </button>
+        <button
+          className={`rounded-xl px-4 py-2 ${
+            editMode === "ceiling"
+              ? "bg-gray-900 text-white"
+              : "border bg-white text-gray-700"
+          }`}
+          onClick={() => setEditMode("ceiling")}
+        >
+          Ceiling
         </button>
       </div>
 
@@ -86,6 +99,49 @@ export default function Toolbar() {
             >
               Delete
             </button>
+          </div>
+        </div>
+      ) : editMode === "ceiling" ? (
+        /* Ceiling mode controls */
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="text-sm font-medium text-gray-700">Add:</div>
+          <button
+            className="rounded-xl border px-3 py-2"
+            onClick={() => addCeilingItem("ceilingLight")}
+          >
+            Light
+          </button>
+          <button
+            className="rounded-xl border px-3 py-2"
+            onClick={() => addCeilingItem("ceilingFan")}
+          >
+            Fan
+          </button>
+
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-sm text-gray-500">
+              {dims.width.toFixed(1)} × {dims.depth.toFixed(1)} {room.unit}
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-400">Grid:</span>
+              <input
+                className="w-16 rounded-lg border px-2 py-1 text-sm"
+                type="number"
+                step="0.1"
+                value={gridSize}
+                onChange={(e) => setGridSize(Number(e.target.value))}
+              />
+            </div>
+
+            {selectedCeilingItemId && (
+              <button
+                className="rounded-xl border border-red-300 px-3 py-2 text-red-600"
+                onClick={() => removeCeilingItem(selectedCeilingItemId)}
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
       ) : (

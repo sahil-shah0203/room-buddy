@@ -20,12 +20,18 @@ export default function PropertiesPanel() {
   const {
     items,
     openings,
+    ceilingItems,
     selectedItemId,
     selectedOpeningId,
+    selectedCeilingItemId,
+    editMode,
     rotateItem,
     resizeItem,
     setItemColor,
     updateOpening,
+    updateCeilingItem,
+    toggleCeilingLight,
+    removeCeilingItem,
     appearance,
     setWallColor,
     setFloorType,
@@ -35,6 +41,7 @@ export default function PropertiesPanel() {
 
   const selected = useMemo(() => items.find((i) => i.id === selectedItemId) ?? null, [items, selectedItemId]);
   const selectedOpening = useMemo(() => openings.find((o) => o.id === selectedOpeningId) ?? null, [openings, selectedOpeningId]);
+  const selectedCeilingItem = useMemo(() => ceilingItems.find((c) => c.id === selectedCeilingItemId) ?? null, [ceilingItems, selectedCeilingItemId]);
 
   return (
     <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-4">
@@ -139,8 +146,84 @@ export default function PropertiesPanel() {
             Drag in 2D view to reposition. Drag handles to resize width.
           </div>
         </div>
+      ) : selectedCeilingItem ? (
+        /* Selected ceiling item properties */
+        <div className="space-y-3">
+          <div className="text-sm font-semibold text-gray-700">
+            Selected {selectedCeilingItem.type === "ceilingFan" ? "Ceiling Fan" : "Ceiling Light"}
+          </div>
+
+          <div>
+            <label className="text-xs opacity-70">Size (diameter)</label>
+            <input
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              type="number"
+              step="0.5"
+              min="0.5"
+              max="8"
+              value={selectedCeilingItem.size}
+              onChange={(e) => updateCeilingItem(selectedCeilingItem.id, { size: Number(e.target.value) })}
+            />
+          </div>
+
+          {/* Light controls only for ceiling lights, not fans */}
+          {selectedCeilingItem.type === "ceilingLight" && (
+            <>
+              <div>
+                <label className="text-xs opacity-70">Light Color</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="color"
+                    className="h-9 w-12 cursor-pointer rounded border"
+                    value={selectedCeilingItem.lightColor}
+                    onChange={(e) => updateCeilingItem(selectedCeilingItem.id, { lightColor: e.target.value })}
+                  />
+                  <span className="text-xs text-gray-500">{selectedCeilingItem.lightColor}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs opacity-70">Light Intensity ({Math.round(selectedCeilingItem.lightIntensity * 100)}%)</label>
+                <input
+                  className="mt-1 w-full"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={selectedCeilingItem.lightIntensity}
+                  onChange={(e) => updateCeilingItem(selectedCeilingItem.id, { lightIntensity: Number(e.target.value) })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-xs opacity-70">Light</label>
+                <button
+                  className={`rounded-lg px-4 py-1.5 text-sm font-medium ${
+                    selectedCeilingItem.isOn
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
+                  onClick={() => toggleCeilingLight(selectedCeilingItem.id)}
+                >
+                  {selectedCeilingItem.isOn ? "On" : "Off"}
+                </button>
+              </div>
+            </>
+          )}
+
+          <button
+            className="w-full rounded-xl border border-red-300 px-3 py-2 text-red-600"
+            onClick={() => removeCeilingItem(selectedCeilingItem.id)}
+          >
+            Delete
+          </button>
+        </div>
       ) : (
-        <div className="text-sm opacity-70">Select an item or opening to edit its properties.</div>
+        <div className="text-sm opacity-70">
+          {editMode === "ceiling"
+            ? "Select a ceiling item to edit its properties."
+            : "Select an item or opening to edit its properties."}
+        </div>
       )}
 
       {/* Room appearance settings */}

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import type { Item, RoomState, FurnitureType, RoomShape, Vertex, EditMode, WallOpening, OpeningType, RoomAppearance, FloorType } from "@/types/room";
+import type { Item, RoomState, FurnitureType, RoomShape, Vertex, EditMode, WallOpening, OpeningType, RoomAppearance, FloorType, CeilingItem, CeilingItemType } from "@/types/room";
 import { clampToRoom, rectsOverlap, isValidPlacement, getRoomDimensions } from "@/lib/geometry/collision";
 import { snapPoint } from "@/lib/geometry/snap";
 import { validateActions } from "@/lib/ai/actions";
@@ -62,6 +62,14 @@ type Actions = {
   applyPlan: (plan: ProposedPlan) => { ok: true } | { ok: false; reason: string };
   previewItems: Item[] | null;
   setPreviewItems: (items: Item[] | null) => void;
+
+  // Ceiling items
+  addCeilingItem: (type: CeilingItemType) => void;
+  moveCeilingItem: (id: string, x: number, y: number) => void;
+  removeCeilingItem: (id: string) => void;
+  selectCeilingItem: (id: string | null) => void;
+  updateCeilingItem: (id: string, updates: Partial<Omit<CeilingItem, "id" | "type">>) => void;
+  toggleCeilingLight: (id: string) => void;
 };
 
 const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string }> = {
@@ -73,6 +81,11 @@ const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string
   rug: { w: 8, d: 10, label: "Rug" },
   dresser: { w: 5, d: 2, label: "Dresser" },
   tvStand: { w: 5, d: 1.5, label: "TV Stand" },
+};
+
+const CEILING_ITEM_DEFAULTS: Record<CeilingItemType, { size: number; label: string }> = {
+  ceilingLight: { size: 1.5, label: "Ceiling Light" },
+  ceilingFan: { size: 4, label: "Ceiling Fan" },
 };
 
 function createPresetShape(preset: PresetShape, width: number, depth: number): RoomShape {
@@ -156,10 +169,12 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
   },
   items: [],
   openings: [],
+  ceilingItems: [],
   appearance: DEFAULT_APPEARANCE,
   selectedItemId: null,
   selectedVertexId: null,
   selectedOpeningId: null,
+  selectedCeilingItemId: null,
   gridSize: 0.5,
   editMode: "furniture",
 
@@ -177,6 +192,7 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     editMode: mode,
     selectedItemId: mode === "furniture" ? s.selectedItemId : null,
     selectedVertexId: mode === "shape" ? s.selectedVertexId : null,
+    selectedCeilingItemId: mode === "ceiling" ? s.selectedCeilingItemId : null,
   })),
 
   setRoomShape: (shape) => set((s) => ({
@@ -593,6 +609,78 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
       ...s,
       items: s.items.map((it) =>
         it.id === id ? { ...it, color } : it
+      ),
+    })),
+
+  // Ceiling items
+  addCeilingItem: (type) => {
+    const s = get();
+    const defaults = CEILING_ITEM_DEFAULTS[type];
+    const dims = getRoomDimensions(s.room);
+    const id = nanoid();
+
+    // Place at room center
+    const x = dims.width / 2;
+    const y = dims.depth / 2;
+
+    const newItem: CeilingItem = {
+      id,
+      type,
+      label: defaults.label,
+      x,
+      y,
+      size: defaults.size,
+      lightColor: "#ffffff",
+      lightIntensity: 0.8,
+      isOn: true,
+    };
+
+    set((state) => ({
+      ...state,
+      ceilingItems: [...state.ceilingItems, newItem],
+      selectedCeilingItemId: id,
+    }));
+  },
+
+  moveCeilingItem: (id, x, y) => {
+    const s = get();
+    const dims = getRoomDimensions(s.room);
+    const snapped = snapPoint({ x, y }, s.gridSize);
+
+    // Clamp to room bounds
+    const clampedX = Math.max(0, Math.min(dims.width, snapped.x));
+    const clampedY = Math.max(0, Math.min(dims.depth, snapped.y));
+
+    set((state) => ({
+      ...state,
+      ceilingItems: state.ceilingItems.map((item) =>
+        item.id === id ? { ...item, x: clampedX, y: clampedY } : item
+      ),
+    }));
+  },
+
+  removeCeilingItem: (id) =>
+    set((s) => ({
+      ...s,
+      ceilingItems: s.ceilingItems.filter((item) => item.id !== id),
+      selectedCeilingItemId: s.selectedCeilingItemId === id ? null : s.selectedCeilingItemId,
+    })),
+
+  selectCeilingItem: (id) => set((s) => ({ ...s, selectedCeilingItemId: id })),
+
+  updateCeilingItem: (id, updates) =>
+    set((s) => ({
+      ...s,
+      ceilingItems: s.ceilingItems.map((item) =>
+        item.id === id ? { ...item, ...updates } : item
+      ),
+    })),
+
+  toggleCeilingLight: (id) =>
+    set((s) => ({
+      ...s,
+      ceilingItems: s.ceilingItems.map((item) =>
+        item.id === id ? { ...item, isOn: !item.isOn } : item
       ),
     })),
 }));
