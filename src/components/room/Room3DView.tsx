@@ -23,26 +23,6 @@ const FURNITURE_COLORS: Record<FurnitureType, string> = {
 // Wall height
 const WALL_HEIGHT = 9;
 
-// Create outdoor texture (sky + grass)
-function createOutdoorTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-  // Sky gradient
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, 180);
-  skyGrad.addColorStop(0, '#87CEEB');
-  skyGrad.addColorStop(1, '#E0F6FF');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, 256, 180);
-  // Grass
-  ctx.fillStyle = '#228B22';
-  ctx.fillRect(0, 180, 256, 76);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
-
 // Create floor texture based on type and color
 function createFloorTexture(floorType: FloorType, floorColor: string, width: number, depth: number): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -448,16 +428,177 @@ function Floor({ width, depth, floorType, floorColor }: { width: number; depth: 
   );
 }
 
-// Component for outdoor view through windows
-function OutdoorView({ width, height, position, rotation }: { width: number; height: number; position: [number, number, number]; rotation: [number, number, number] }) {
-  const texture = useMemo(() => createOutdoorTexture(), []);
+// 3D Outdoor environment - real grass ground, sky dome, and trees
+function Outdoor3D({ roomCenter }: { roomCenter: [number, number] }) {
+  const [cx, cz] = roomCenter;
+
+  // Generate trees around all sides of the room for visibility from any window
+  const treePositions = useMemo(() => {
+    const trees: { x: number; z: number; scale: number }[] = [];
+    // Trees on all four sides at various distances
+    const distances = [15, 25, 35, 50];
+    const sides = [
+      { dx: 0, dz: -1 },  // North
+      { dx: 0, dz: 1 },   // South
+      { dx: -1, dz: 0 },  // West
+      { dx: 1, dz: 0 },   // East
+    ];
+    sides.forEach(({ dx, dz }) => {
+      distances.forEach((dist, di) => {
+        const count = 3 + di; // More trees at greater distances
+        for (let i = 0; i < count; i++) {
+          const spread = 20 + di * 15;
+          const perpOffset = (i - (count - 1) / 2) * (spread / count);
+          trees.push({
+            x: cx + dx * dist + dz * perpOffset + (Math.random() - 0.5) * 5,
+            z: cz + dz * dist + dx * perpOffset + (Math.random() - 0.5) * 5,
+            scale: 0.8 + Math.random() * 0.5,
+          });
+        }
+      });
+    });
+    return trees;
+  }, [cx, cz]);
 
   return (
-    <mesh position={position} rotation={rotation}>
-      <planeGeometry args={[width, height]} />
-      <meshBasicMaterial map={texture} />
-    </mesh>
+    <group>
+      {/* Large grass ground plane - extends far in all directions */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, -0.05, cz]} receiveShadow>
+        <planeGeometry args={[300, 300]} />
+        <meshStandardMaterial color="#3a8f3a" roughness={0.95} />
+      </mesh>
+
+      {/* Sky dome */}
+      <mesh position={[cx, 0, cz]}>
+        <sphereGeometry args={[120, 32, 32]} />
+        <meshBasicMaterial color="#87CEEB" side={THREE.BackSide} />
+      </mesh>
+
+      {/* Sun with glow */}
+      <mesh position={[cx + 60, 70, cz - 60]}>
+        <sphereGeometry args={[6, 16, 16]} />
+        <meshBasicMaterial color="#FFF8DC" />
+      </mesh>
+      <pointLight position={[cx + 60, 70, cz - 60]} intensity={0.5} color="#FFF8DC" />
+
+      {/* Clouds */}
+      {[
+        [cx - 30, 50, cz - 40],
+        [cx + 40, 55, cz - 50],
+        [cx - 10, 48, cz + 45],
+        [cx + 50, 52, cz + 30],
+      ].map(([x, y, z], i) => (
+        <group key={`cloud-${i}`} position={[x, y, z]}>
+          <mesh>
+            <sphereGeometry args={[4, 8, 8]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.9} />
+          </mesh>
+          <mesh position={[3, -0.5, 0]}>
+            <sphereGeometry args={[3, 8, 8]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.9} />
+          </mesh>
+          <mesh position={[-2.5, -0.3, 1]}>
+            <sphereGeometry args={[2.5, 8, 8]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.9} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Trees distributed around the room */}
+      {treePositions.map((tree, i) => (
+        <group key={`tree-${i}`} position={[tree.x, 0, tree.z]} scale={tree.scale}>
+          {/* Tree trunk */}
+          <mesh position={[0, 2, 0]} castShadow>
+            <cylinderGeometry args={[0.3, 0.5, 4, 8]} />
+            <meshStandardMaterial color="#5D4037" roughness={0.9} />
+          </mesh>
+          {/* Tree foliage - layered for depth */}
+          <mesh position={[0, 5.5, 0]} castShadow>
+            <coneGeometry args={[2.5, 4, 8]} />
+            <meshStandardMaterial color="#2E7D32" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 7, 0]} castShadow>
+            <coneGeometry args={[2, 3, 8]} />
+            <meshStandardMaterial color="#388E3C" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 8.2, 0]} castShadow>
+            <coneGeometry args={[1.3, 2, 8]} />
+            <meshStandardMaterial color="#43A047" roughness={0.9} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Distant hills/mountains for horizon depth */}
+      {[
+        { x: cx - 80, z: cz - 100, scale: 1.2 },
+        { x: cx + 80, z: cz - 90, scale: 1 },
+        { x: cx, z: cz - 110, scale: 1.5 },
+        { x: cx - 90, z: cz + 80, scale: 0.9 },
+        { x: cx + 85, z: cz + 90, scale: 1.1 },
+      ].map((hill, i) => (
+        <mesh key={`hill-${i}`} position={[hill.x, 0, hill.z]} scale={[hill.scale * 30, hill.scale * 15, hill.scale * 30]}>
+          <sphereGeometry args={[1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#5a8f5a" roughness={1} />
+        </mesh>
+      ))}
+    </group>
   );
+}
+
+// Keyboard controls for first-person movement
+function KeyboardControls({ speed = 0.15 }: { speed?: number }) {
+  const { camera } = useThree();
+  const keys = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keys.current.add(e.key.toLowerCase());
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keys.current.delete(e.key.toLowerCase());
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  useFrame(() => {
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+    direction.y = 0;
+    direction.normalize();
+
+    const right = new THREE.Vector3();
+    right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+
+    // WASD movement
+    if (keys.current.has('w') || keys.current.has('arrowup')) {
+      camera.position.addScaledVector(direction, speed);
+    }
+    if (keys.current.has('s') || keys.current.has('arrowdown')) {
+      camera.position.addScaledVector(direction, -speed);
+    }
+    if (keys.current.has('a') || keys.current.has('arrowleft')) {
+      camera.position.addScaledVector(right, -speed);
+    }
+    if (keys.current.has('d') || keys.current.has('arrowright')) {
+      camera.position.addScaledVector(right, speed);
+    }
+    // Q/E for up/down
+    if (keys.current.has('q')) {
+      camera.position.y -= speed;
+    }
+    if (keys.current.has('e')) {
+      camera.position.y += speed;
+    }
+  });
+
+  return null;
 }
 
 function PolygonFloor({ vertices, floorType, floorColor }: { vertices: { x: number; y: number }[]; floorType: FloorType; floorColor: string }) {
@@ -492,6 +633,270 @@ function PolygonFloor({ vertices, floorType, floorColor }: { vertices: { x: numb
   );
 }
 
+// Wall segment with proper cutouts for openings
+function WallWithOpenings({
+  start,
+  end,
+  wallIndex,
+  height,
+  wallColor,
+  openings,
+}: {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  wallIndex: number;
+  height: number;
+  wallColor: string;
+  openings: WallOpening[];
+}) {
+  const baseboardColor = adjustColor(wallColor, -30);
+  const dx = end.x - start.x;
+  const dz = end.y - start.y;
+  const length = Math.sqrt(dx * dx + dz * dz);
+  const angle = Math.atan2(dz, dx);
+
+  // Perpendicular direction (pointing inward - towards room center)
+  const perpX = -Math.sin(angle);
+  const perpZ = Math.cos(angle);
+
+  const midX = (start.x + end.x) / 2;
+  const midZ = (start.y + end.y) / 2;
+
+  // Get openings for this wall and sort by position
+  const wallOpenings = openings
+    .filter(o => o.wallIndex === wallIndex)
+    .sort((a, b) => a.position - b.position);
+
+  // Calculate wall segments around openings (segment-based approach - more reliable)
+  const wallSegments = useMemo(() => {
+    if (wallOpenings.length === 0) {
+      // No openings - full wall
+      return [{ start: 0, end: length, bottom: 0, top: height }];
+    }
+
+    const segments: { start: number; end: number; bottom: number; top: number }[] = [];
+    let lastEnd = 0;
+
+    wallOpenings.forEach((opening) => {
+      const posAlongWall = opening.position * length;
+      const halfWidth = opening.width / 2;
+      const left = Math.max(0, posAlongWall - halfWidth);
+      const right = Math.min(length, posAlongWall + halfWidth);
+      const bottom = opening.fromFloor;
+      const top = opening.fromFloor + opening.height;
+
+      // Segment to the left of this opening
+      if (left > lastEnd + 0.05) {
+        segments.push({ start: lastEnd, end: left, bottom: 0, top: height });
+      }
+
+      // Segment above the opening
+      if (top < height - 0.05) {
+        segments.push({ start: left, end: right, bottom: top, top: height });
+      }
+
+      // Segment below the opening (for windows with fromFloor > 0)
+      if (bottom > 0.05) {
+        segments.push({ start: left, end: right, bottom: 0, top: bottom });
+      }
+
+      lastEnd = right;
+    });
+
+    // Segment after the last opening
+    if (lastEnd < length - 0.05) {
+      segments.push({ start: lastEnd, end: length, bottom: 0, top: height });
+    }
+
+    return segments;
+  }, [length, height, wallOpenings]);
+
+  return (
+    <group>
+      {/* Wall segments */}
+      {wallSegments.map((seg, idx) => {
+        const segLength = seg.end - seg.start;
+        const segHeight = seg.top - seg.bottom;
+        const segCenterAlongWall = seg.start + segLength / 2;
+        const segCenterY = seg.bottom + segHeight / 2;
+
+        // Position along the wall from start point
+        const posX = start.x + Math.cos(angle) * segCenterAlongWall;
+        const posZ = start.y + Math.sin(angle) * segCenterAlongWall;
+
+        return (
+          <mesh
+            key={`wall-seg-${idx}`}
+            position={[posX, segCenterY, posZ]}
+            rotation={[0, -angle, 0]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[segLength, segHeight, 0.25]} />
+            <meshStandardMaterial color={wallColor} roughness={0.9} metalness={0} />
+          </mesh>
+        );
+      })}
+
+      {/* Baseboard */}
+      <mesh
+        position={[midX, 0.15, midZ]}
+        rotation={[0, -angle, 0]}
+      >
+        <boxGeometry args={[length + 0.1, 0.3, 0.35]} />
+        <meshStandardMaterial color={baseboardColor} roughness={0.7} metalness={0} />
+      </mesh>
+
+      {/* Window/door frames and details */}
+      {wallOpenings.map((opening) => {
+        const posAlongWall = opening.position * length;
+        const openingX = start.x + Math.cos(angle) * posAlongWall;
+        const openingZ = start.y + Math.sin(angle) * posAlongWall;
+        const openingY = opening.fromFloor + opening.height / 2;
+
+        return (
+          <group key={opening.id}>
+            {opening.type === "window" ? (
+              <>
+                {/* Glass pane - transparent so you can see outdoor 3D */}
+                <mesh
+                  position={[openingX + perpX * 0.05, openingY, openingZ + perpZ * 0.05]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <planeGeometry args={[opening.width - 0.2, opening.height - 0.2]} />
+                  <meshPhysicalMaterial
+                    color="#88ccff"
+                    transparent
+                    opacity={0.15}
+                    roughness={0}
+                    metalness={0.1}
+                    side={THREE.DoubleSide}
+                  />
+                </mesh>
+                {/* Window frame - 4 separate pieces */}
+                {/* Top frame */}
+                <mesh
+                  position={[openingX + perpX * 0.13, openingY + opening.height / 2 - 0.1, openingZ + perpZ * 0.13]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[opening.width + 0.2, 0.15, 0.12]} />
+                  <meshStandardMaterial color="#ffffff" roughness={0.6} />
+                </mesh>
+                {/* Bottom frame (window sill) */}
+                <mesh
+                  position={[openingX + perpX * 0.1, openingY - opening.height / 2 + 0.08, openingZ + perpZ * 0.1]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[opening.width + 0.3, 0.12, 0.2]} />
+                  <meshStandardMaterial color="#ffffff" roughness={0.6} />
+                </mesh>
+                {/* Left frame */}
+                <mesh
+                  position={[
+                    openingX + perpX * 0.13 - Math.cos(angle) * (opening.width / 2),
+                    openingY,
+                    openingZ + perpZ * 0.13 - Math.sin(angle) * (opening.width / 2)
+                  ]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[0.12, opening.height, 0.12]} />
+                  <meshStandardMaterial color="#ffffff" roughness={0.6} />
+                </mesh>
+                {/* Right frame */}
+                <mesh
+                  position={[
+                    openingX + perpX * 0.13 + Math.cos(angle) * (opening.width / 2),
+                    openingY,
+                    openingZ + perpZ * 0.13 + Math.sin(angle) * (opening.width / 2)
+                  ]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[0.12, opening.height, 0.12]} />
+                  <meshStandardMaterial color="#ffffff" roughness={0.6} />
+                </mesh>
+                {/* Window cross bars */}
+                <mesh
+                  position={[openingX + perpX * 0.08, openingY, openingZ + perpZ * 0.08]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[0.03, opening.height - 0.3, 0.02]} />
+                  <meshStandardMaterial color="#ffffff" roughness={0.6} />
+                </mesh>
+                <mesh
+                  position={[openingX + perpX * 0.08, openingY, openingZ + perpZ * 0.08]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[opening.width - 0.3, 0.03, 0.02]} />
+                  <meshStandardMaterial color="#ffffff" roughness={0.6} />
+                </mesh>
+              </>
+            ) : (
+              <>
+                {/* Door frame */}
+                {/* Top */}
+                <mesh
+                  position={[openingX + perpX * 0.13, opening.fromFloor + opening.height + 0.08, openingZ + perpZ * 0.13]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[opening.width + 0.25, 0.15, 0.15]} />
+                  <meshStandardMaterial color="#654321" roughness={0.7} />
+                </mesh>
+                {/* Left */}
+                <mesh
+                  position={[
+                    openingX + perpX * 0.13 - Math.cos(angle) * (opening.width / 2 + 0.05),
+                    opening.fromFloor + opening.height / 2,
+                    openingZ + perpZ * 0.13 - Math.sin(angle) * (opening.width / 2 + 0.05)
+                  ]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[0.12, opening.height, 0.15]} />
+                  <meshStandardMaterial color="#654321" roughness={0.7} />
+                </mesh>
+                {/* Right */}
+                <mesh
+                  position={[
+                    openingX + perpX * 0.13 + Math.cos(angle) * (opening.width / 2 + 0.05),
+                    opening.fromFloor + opening.height / 2,
+                    openingZ + perpZ * 0.13 + Math.sin(angle) * (opening.width / 2 + 0.05)
+                  ]}
+                  rotation={[0, -angle, 0]}
+                >
+                  <boxGeometry args={[0.12, opening.height, 0.15]} />
+                  <meshStandardMaterial color="#654321" roughness={0.7} />
+                </mesh>
+                {/* Door panel - slightly ajar to show it's a door */}
+                <mesh
+                  position={[
+                    openingX + perpX * 0.2 - Math.cos(angle) * 0.15,
+                    opening.fromFloor + opening.height / 2,
+                    openingZ + perpZ * 0.2 - Math.sin(angle) * 0.15
+                  ]}
+                  rotation={[0, -angle + 0.3, 0]}
+                >
+                  <boxGeometry args={[opening.width - 0.2, opening.height - 0.1, 0.05]} />
+                  <meshStandardMaterial color="#8B4513" roughness={0.8} />
+                </mesh>
+                {/* Door handle */}
+                <mesh
+                  position={[
+                    openingX + Math.cos(angle) * (opening.width / 2 - 0.5) + perpX * 0.24,
+                    opening.fromFloor + opening.height / 2 - 0.3,
+                    openingZ + Math.sin(angle) * (opening.width / 2 - 0.5) + perpZ * 0.24
+                  ]}
+                >
+                  <sphereGeometry args={[0.08, 16, 16]} />
+                  <meshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+                </mesh>
+              </>
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 function Walls({
   vertices,
   height = WALL_HEIGHT,
@@ -503,150 +908,20 @@ function Walls({
   wallColor: string;
   openings: WallOpening[];
 }) {
-  const baseboardColor = adjustColor(wallColor, -30);
-
   return (
     <>
       {vertices.map((start, i) => {
         const end = vertices[(i + 1) % vertices.length];
-        const dx = end.x - start.x;
-        const dz = end.y - start.y;
-        const length = Math.sqrt(dx * dx + dz * dz);
-        const angle = Math.atan2(dz, dx);
-        const midX = (start.x + end.x) / 2;
-        const midZ = (start.y + end.y) / 2;
-
-        // Perpendicular direction (pointing inward - towards room center)
-        const perpX = -Math.sin(angle);
-        const perpZ = Math.cos(angle);
-
-        // Get openings for this wall
-        const wallOpenings = openings.filter(o => o.wallIndex === i);
-
         return (
-          <group key={i}>
-            {/* Main wall */}
-            <mesh
-              position={[midX, height / 2, midZ]}
-              rotation={[0, -angle, 0]}
-              castShadow
-              receiveShadow
-            >
-              <boxGeometry args={[length, height, 0.25]} />
-              <meshStandardMaterial color={wallColor} roughness={0.9} metalness={0} />
-            </mesh>
-            {/* Baseboard */}
-            <mesh
-              position={[midX, 0.15, midZ]}
-              rotation={[0, -angle, 0]}
-            >
-              <boxGeometry args={[length + 0.1, 0.3, 0.35]} />
-              <meshStandardMaterial color={baseboardColor} roughness={0.7} metalness={0} />
-            </mesh>
-
-            {/* Openings (windows/doors) */}
-            {wallOpenings.map((opening) => {
-              // Calculate position along the wall from start
-              const posAlongWall = opening.position * length;
-              const openingX = start.x + Math.cos(angle) * posAlongWall;
-              const openingZ = start.y + Math.sin(angle) * posAlongWall;
-              const openingY = opening.fromFloor + opening.height / 2;
-
-              // Offset outward from wall (negative perpendicular = outward)
-              const outwardX = -perpX;
-              const outwardZ = -perpZ;
-
-              return (
-                <group key={opening.id}>
-                  {opening.type === "window" ? (
-                    <>
-                      {/* Outdoor view behind window - sky and grass */}
-                      <OutdoorView
-                        width={opening.width - 0.2}
-                        height={opening.height - 0.2}
-                        position={[openingX + outwardX * 0.3, openingY, openingZ + outwardZ * 0.3]}
-                        rotation={[0, -angle, 0]}
-                      />
-                      {/* Window frame */}
-                      <mesh
-                        position={[openingX + perpX * 0.14, openingY, openingZ + perpZ * 0.14]}
-                        rotation={[0, -angle, 0]}
-                      >
-                        <boxGeometry args={[opening.width + 0.3, opening.height + 0.3, 0.08]} />
-                        <meshStandardMaterial color="#ffffff" roughness={0.6} />
-                      </mesh>
-                      {/* Window glass - slightly tinted */}
-                      <mesh
-                        position={[openingX + perpX * 0.12, openingY, openingZ + perpZ * 0.12]}
-                        rotation={[0, -angle, 0]}
-                      >
-                        <planeGeometry args={[opening.width - 0.1, opening.height - 0.1]} />
-                        <meshStandardMaterial
-                          color="#aaddff"
-                          transparent
-                          opacity={0.2}
-                          roughness={0.1}
-                        />
-                      </mesh>
-                      {/* Window cross bars */}
-                      <mesh
-                        position={[openingX + perpX * 0.15, openingY, openingZ + perpZ * 0.15]}
-                        rotation={[0, -angle, 0]}
-                      >
-                        <boxGeometry args={[0.06, opening.height - 0.3, 0.04]} />
-                        <meshStandardMaterial color="#ffffff" roughness={0.6} />
-                      </mesh>
-                      <mesh
-                        position={[openingX + perpX * 0.15, openingY, openingZ + perpZ * 0.15]}
-                        rotation={[0, -angle, 0]}
-                      >
-                        <boxGeometry args={[opening.width - 0.3, 0.06, 0.04]} />
-                        <meshStandardMaterial color="#ffffff" roughness={0.6} />
-                      </mesh>
-                    </>
-                  ) : (
-                    <>
-                      {/* Dark area behind door */}
-                      <mesh
-                        position={[openingX + outwardX * 0.2, openingY, openingZ + outwardZ * 0.2]}
-                        rotation={[0, -angle, 0]}
-                      >
-                        <planeGeometry args={[opening.width - 0.1, opening.height - 0.1]} />
-                        <meshBasicMaterial color="#2a2a2a" />
-                      </mesh>
-                      {/* Door frame */}
-                      <mesh
-                        position={[openingX + perpX * 0.14, openingY, openingZ + perpZ * 0.14]}
-                        rotation={[0, -angle, 0]}
-                      >
-                        <boxGeometry args={[opening.width + 0.4, opening.height + 0.2, 0.12]} />
-                        <meshStandardMaterial color="#654321" roughness={0.7} />
-                      </mesh>
-                      {/* Door panel */}
-                      <mesh
-                        position={[openingX + perpX * 0.18, openingY, openingZ + perpZ * 0.18]}
-                        rotation={[0, -angle, 0]}
-                      >
-                        <boxGeometry args={[opening.width - 0.15, opening.height - 0.15, 0.06]} />
-                        <meshStandardMaterial color="#8B4513" roughness={0.8} />
-                      </mesh>
-                      {/* Door handle */}
-                      <mesh
-                        position={[
-                          openingX + Math.cos(angle) * (opening.width / 2 - 0.4) + perpX * 0.22,
-                          openingY - 0.5,
-                          openingZ + Math.sin(angle) * (opening.width / 2 - 0.4) + perpZ * 0.22
-                        ]}
-                      >
-                        <sphereGeometry args={[0.1, 16, 16]} />
-                        <meshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
-                      </mesh>
-                    </>
-                  )}
-                </group>
-              );
-            })}
-          </group>
+          <WallWithOpenings
+            key={i}
+            start={start}
+            end={end}
+            wallIndex={i}
+            height={height}
+            wallColor={wallColor}
+            openings={openings}
+          />
         );
       })}
     </>
@@ -744,15 +1019,21 @@ function RoomScene() {
     };
   }, [isDragging, draggedItem, items]);
 
+  // Room center for outdoor environment positioning
+  const roomCenter: [number, number] = [bbox.width / 2, bbox.depth / 2];
+
   return (
     <>
-      {/* Camera - positioned inside the room at eye level */}
+      {/* Camera - positioned inside the room at eye level with wider FOV */}
       <PerspectiveCamera
         makeDefault
         position={[bbox.width / 2, 5, bbox.depth * 0.85]}
-        fov={75}
+        fov={100}
         near={0.1}
       />
+
+      {/* Keyboard controls for WASD movement */}
+      <KeyboardControls speed={0.2} />
 
       {/* Lighting - interior lighting setup */}
       <ambientLight intensity={0.6} />
@@ -772,6 +1053,9 @@ function RoomScene() {
       <pointLight position={[1, 7, 1]} intensity={0.3} />
       <pointLight position={[bbox.width - 1, 7, bbox.depth - 1]} intensity={0.3} />
       <hemisphereLight args={["#ffeeb1", "#080820", 0.5]} />
+
+      {/* 3D Outdoor environment - visible through windows */}
+      <Outdoor3D roomCenter={roomCenter} />
 
       {/* Floor */}
       {room.shape.type === "polygon" ? (
