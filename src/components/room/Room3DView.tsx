@@ -1329,19 +1329,23 @@ export default function Room3DView() {
   const [fov, setFov] = useState(90);
 
   return (
-    <div className="rounded-2xl border bg-white p-5 shadow-sm select-none">
-      {/* Zoom slider */}
-      <div className="mb-3 flex items-center gap-3">
-        <span className="text-xs text-gray-500">Zoom:</span>
+    <div className="relative rounded-2xl border bg-gray-900 shadow-lg select-none overflow-hidden w-full h-full min-h-[600px]">
+      {/* Zoom slider - floating overlay */}
+      <div className="absolute top-4 left-4 z-10 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-3">
+        <span className="text-xs text-white/70">FOV:</span>
         <input
           type="range"
           min="50"
           max="120"
           value={fov}
           onChange={(e) => setFov(Number(e.target.value))}
-          className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          className="w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer"
         />
-        <span className="text-xs text-gray-400 w-8">{fov}°</span>
+        <span className="text-xs text-white/50 w-8">{fov}°</span>
+      </div>
+      {/* Controls hint */}
+      <div className="absolute bottom-4 left-4 z-10 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2">
+        <span className="text-xs text-white/60">WASD to move, drag to look</span>
       </div>
       <Canvas
         shadows
@@ -1351,7 +1355,7 @@ export default function Room3DView() {
           toneMappingExposure: 1.0,
         }}
         dpr={[1, 2]}
-        style={{ width: 640, height: 640, display: "block" }}
+        style={{ width: "100%", height: "100%", minHeight: 600, display: "block" }}
       >
         <color attach="background" args={["#87ceeb"]} />
         <fog attach="fog" args={["#a8c8e8", 30, 80]} />

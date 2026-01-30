@@ -5,7 +5,11 @@ import { useRoomStore } from "@/store/roomStore";
 
 type Msg = { role: "user" | "assistant"; text: string };
 
-export default function ChatPanel() {
+interface ChatPanelProps {
+  compact?: boolean;
+}
+
+export default function ChatPanel({ compact = false }: ChatPanelProps) {
   // ---- Zustand selectors (IMPORTANT: no object literals here) ----
   const setAiPlan = useRoomStore((s) => s.setAiPlan);
 
@@ -81,6 +85,45 @@ export default function ChatPanel() {
   }
 
   // ---- UI ----
+  if (compact) {
+    return (
+      <div className="flex flex-col h-full p-3">
+        <div className="flex-1 overflow-auto space-y-2 min-h-0">
+          {log.map((m, i) => (
+            <div
+              key={i}
+              className={`rounded-lg px-3 py-2 text-sm ${
+                m.role === "user" ? "bg-blue-50 border border-blue-100" : "bg-white border"
+              }`}
+            >
+              {m.text}
+            </div>
+          ))}
+        </div>
+
+        {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
+
+        <div className="mt-3 flex gap-2 shrink-0">
+          <input
+            className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder={loading ? "Thinking..." : "Describe your room..."}
+            disabled={loading}
+          />
+          <button
+            className="rounded-lg bg-gray-900 text-white px-4 py-2 text-sm hover:bg-gray-800 disabled:opacity-50"
+            onClick={send}
+            disabled={loading}
+          >
+            {loading ? "..." : "Send"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border bg-white p-4 shadow-sm flex flex-col h-[520px]">
       <div className="text-sm font-medium mb-2">Chat</div>
@@ -106,7 +149,7 @@ export default function ChatPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder={loading ? "Thinking…" : "Describe your room or vibe"}
+          placeholder={loading ? "Thinking..." : "Describe your room or vibe"}
           disabled={loading}
         />
         <button
@@ -114,7 +157,7 @@ export default function ChatPanel() {
           onClick={send}
           disabled={loading}
         >
-          {loading ? "…" : "Send"}
+          {loading ? "..." : "Send"}
         </button>
       </div>
     </div>

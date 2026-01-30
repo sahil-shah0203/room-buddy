@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
 import { derivePreviewItems } from "@/lib/ai/preview";
 
-export default function SuggestionsTray() {
+interface SuggestionsTrayProps {
+  compact?: boolean;
+}
+
+export default function SuggestionsTray({ compact = false }: SuggestionsTrayProps) {
   // ---- Zustand selectors (no object literals) ----
   const aiPlan = useRoomStore((s) => s.aiPlan);
   const applyPlan = useRoomStore((s) => s.applyPlan);
@@ -52,7 +56,7 @@ export default function SuggestionsTray() {
   }
 
   return (
-    <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+    <div className={compact ? "space-y-2" : "rounded-2xl border bg-white p-4 shadow-sm space-y-3"}>
       <div className="text-sm font-medium">AI Suggestions</div>
 
       {!aiPlan ? (

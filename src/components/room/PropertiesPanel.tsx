@@ -16,7 +16,11 @@ const FURNITURE_COLORS: Record<string, string> = {
   tvStand: "#1f2937",
 };
 
-export default function PropertiesPanel() {
+interface PropertiesPanelProps {
+  compact?: boolean;
+}
+
+export default function PropertiesPanel({ compact = false }: PropertiesPanelProps) {
   const {
     items,
     openings,
@@ -44,7 +48,7 @@ export default function PropertiesPanel() {
   const selectedCeilingItem = useMemo(() => ceilingItems.find((c) => c.id === selectedCeilingItemId) ?? null, [ceilingItems, selectedCeilingItemId]);
 
   return (
-    <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-4">
+    <div className={compact ? "space-y-3" : "rounded-2xl border bg-white p-4 shadow-sm space-y-4"}>
       {/* Selected item properties */}
       {selected ? (
         <div className="space-y-3">

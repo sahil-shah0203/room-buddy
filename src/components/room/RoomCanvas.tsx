@@ -47,7 +47,7 @@ export default function RoomCanvas() {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<DragState>({ type: "none" });
 
-  const canvasPx = 640;
+  const canvasPx = 900;
   const bbox = useMemo(() => getBoundingBox(room.shape), [room.shape]);
 
   const scale = useMemo(() => {
@@ -597,7 +597,7 @@ export default function RoomCanvas() {
   return (
     <div
       ref={wrapRef}
-      className="rounded-2xl border bg-white p-5 shadow-sm select-none"
+      className="select-none"
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerDown={onCanvasClick}

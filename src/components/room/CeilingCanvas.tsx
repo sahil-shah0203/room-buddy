@@ -22,7 +22,7 @@ export default function CeilingCanvas() {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<DragState>({ type: "none" });
 
-  const canvasPx = 640;
+  const canvasPx = 900;
   const bbox = useMemo(() => getBoundingBox(room.shape), [room.shape]);
 
   const scale = useMemo(() => {
@@ -217,17 +217,11 @@ export default function CeilingCanvas() {
   return (
     <div
       ref={wrapRef}
-      className="rounded-2xl border bg-white p-5 shadow-sm select-none"
+      className="select-none"
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerDown={onCanvasClick}
     >
-      {/* Header */}
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-700">Ceiling View</span>
-        <span className="text-xs text-gray-400">(top-down)</span>
-      </div>
-
       <svg width={canvasPx} height={canvasPx} className="block overflow-visible">
         <defs>
           <clipPath id="ceiling-clip">
