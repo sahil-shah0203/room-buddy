@@ -443,7 +443,13 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
       selectedItemId: null,
     })),
 
-  selectItem: (id) => set((s) => ({ ...s, selectedItemId: id })),
+  selectItem: (id) => set((s) => ({
+    ...s,
+    selectedItemId: id,
+    // Clear other selection types - selection is mutually exclusive
+    selectedCeilingItemId: null,
+    selectedOpeningId: null,
+  })),
 
   moveItem: (id, x, y, opts) => {
     const s = get();
@@ -584,7 +590,13 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
       selectedOpeningId: s.selectedOpeningId === id ? null : s.selectedOpeningId,
     })),
 
-  selectOpening: (id) => set((s) => ({ ...s, selectedOpeningId: id })),
+  selectOpening: (id) => set((s) => ({
+    ...s,
+    selectedOpeningId: id,
+    // Clear other selection types - selection is mutually exclusive
+    selectedItemId: null,
+    selectedCeilingItemId: null,
+  })),
 
   updateOpening: (id, updates) =>
     set((s) => ({
@@ -681,7 +693,13 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
       selectedCeilingItemId: s.selectedCeilingItemId === id ? null : s.selectedCeilingItemId,
     })),
 
-  selectCeilingItem: (id) => set((s) => ({ ...s, selectedCeilingItemId: id })),
+  selectCeilingItem: (id) => set((s) => ({
+    ...s,
+    selectedCeilingItemId: id,
+    // Clear other selection types - selection is mutually exclusive
+    selectedItemId: null,
+    selectedOpeningId: null,
+  })),
 
   updateCeilingItem: (id, updates) =>
     set((s) => ({

@@ -668,7 +668,7 @@ function Outdoor3D({ roomCenter }: { roomCenter: [number, number] }) {
 }
 
 // First-person controls - WASD movement + mouse look
-function FirstPersonControls({ speed = 0.15 }: { speed?: number }) {
+function FirstPersonControls({ speed = 0.15, disabledRef }: { speed?: number; disabledRef: React.MutableRefObject<boolean> }) {
   const { camera, gl } = useThree();
   const keys = useRef<Set<string>>(new Set());
   const isMouseDown = useRef(false);
@@ -696,11 +696,14 @@ function FirstPersonControls({ speed = 0.15 }: { speed?: number }) {
       isMouseDown.current = false;
     };
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isMouseDown.current) return;
-
+      // Always update lastMouse to prevent jumps when re-enabling
       const deltaX = e.clientX - lastMouse.current.x;
       const deltaY = e.clientY - lastMouse.current.y;
       lastMouse.current = { x: e.clientX, y: e.clientY };
+
+      // Skip rotation accumulation if disabled or mouse not down
+      if (!isMouseDown.current) return;
+      if (disabledRef?.current) return;
 
       // Rotate camera
       rotation.current.y -= deltaX * 0.003;
@@ -713,9 +716,22 @@ function FirstPersonControls({ speed = 0.15 }: { speed?: number }) {
     };
 
     const canvas = gl.domElement;
+
+    // Check if mouse event is within canvas bounds
+    const isInCanvas = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      return e.clientX >= rect.left && e.clientX <= rect.right &&
+             e.clientY >= rect.top && e.clientY <= rect.bottom;
+    };
+
+    const handleMouseDownWindow = (e: MouseEvent) => {
+      if (!isInCanvas(e)) return;
+      handleMouseDown(e);
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    canvas.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousedown', handleMouseDownWindow);
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('contextmenu', handleContextMenu);
@@ -723,7 +739,7 @@ function FirstPersonControls({ speed = 0.15 }: { speed?: number }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      canvas.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousedown', handleMouseDownWindow);
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('contextmenu', handleContextMenu);
@@ -731,7 +747,7 @@ function FirstPersonControls({ speed = 0.15 }: { speed?: number }) {
   }, [gl, camera]);
 
   useFrame(() => {
-    // Apply rotation
+    // Apply rotation (always apply current rotation state)
     camera.rotation.order = 'YXZ';
     camera.rotation.y = rotation.current.y;
     camera.rotation.x = rotation.current.x;
@@ -1170,11 +1186,14 @@ function Ceiling({ vertices, height = WALL_HEIGHT, ceilingColor }: { vertices: {
 }
 
 function RoomScene({ fov }: { fov: number }) {
-  const { room, items, selectedItemId, selectItem, moveItem, openings, appearance, ceilingItems, selectedCeilingItemId, selectCeilingItem } = useRoomStore();
+  const { room, items, selectedItemId, selectItem, moveItem, openings, appearance, ceilingItems, selectedCeilingItemId, selectCeilingItem, moveCeilingItem } = useRoomStore();
   const [isDragging, setIsDragging] = useState(false);
-  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const isDraggingRef = useRef(false); // Immediate sync ref for FirstPersonControls
+  const [draggedItem, setDraggedItem] = useState<{ id: string; type: "furniture" | "ceiling" } | null>(null);
+  const draggedItemRef = useRef<{ id: string; type: "furniture" | "ceiling" } | null>(null);
   const { camera, raycaster, gl } = useThree();
   const floorPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const ceilingPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), -WALL_HEIGHT)); // Plane at ceiling height
   const pointer = useRef(new THREE.Vector2());
 
   const bbox = getBoundingBox(room.shape);
@@ -1189,35 +1208,57 @@ function RoomScene({ fov }: { fov: number }) {
         { x: 0, y: room.shape.depth },
       ];
 
-  // Handle mouse move for dragging
+  // Handle mouse move for dragging - unified for both furniture and ceiling items
   const handlePointerMove = (e: React.PointerEvent | PointerEvent) => {
     const rect = gl.domElement.getBoundingClientRect();
     pointer.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-    if (!isDragging || !draggedItem) return;
+    // Use refs for immediate access (state updates are async)
+    if (!isDraggingRef.current || !draggedItemRef.current) return;
 
     const intersectPoint = new THREE.Vector3();
     raycaster.setFromCamera(pointer.current, camera);
-    raycaster.ray.intersectPlane(floorPlane.current, intersectPoint);
+
+    // Use appropriate plane based on item type
+    const plane = draggedItemRef.current.type === "ceiling" ? ceilingPlane.current : floorPlane.current;
+    raycaster.ray.intersectPlane(plane, intersectPoint);
 
     if (intersectPoint) {
-      const item = items.find(i => i.id === draggedItem);
-      if (item) {
-        const newX = intersectPoint.x - item.w / 2;
-        const newZ = intersectPoint.z - item.d / 2;
-        moveItem(draggedItem, newX, newZ, { snap: true });
+      if (draggedItemRef.current.type === "furniture") {
+        const item = items.find(i => i.id === draggedItemRef.current!.id);
+        if (item) {
+          const newX = intersectPoint.x - item.w / 2;
+          const newZ = intersectPoint.z - item.d / 2;
+          moveItem(draggedItemRef.current.id, newX, newZ, { snap: true });
+        }
+      } else {
+        // Ceiling items use center position directly
+        moveCeilingItem(draggedItemRef.current.id, intersectPoint.x, intersectPoint.z);
       }
     }
   };
 
-  const handlePointerDown = (itemId: string) => {
+  // Unified handlers for starting drag on any item type
+  const handleFurniturePointerDown = (itemId: string) => {
+    isDraggingRef.current = true;
+    draggedItemRef.current = { id: itemId, type: "furniture" };
     setIsDragging(true);
-    setDraggedItem(itemId);
+    setDraggedItem({ id: itemId, type: "furniture" });
     selectItem(itemId);
   };
 
+  const handleCeilingPointerDown = (itemId: string) => {
+    isDraggingRef.current = true;
+    draggedItemRef.current = { id: itemId, type: "ceiling" };
+    setIsDragging(true);
+    setDraggedItem({ id: itemId, type: "ceiling" });
+    selectCeilingItem(itemId);
+  };
+
   const handlePointerUp = () => {
+    isDraggingRef.current = false;
+    draggedItemRef.current = null;
     setIsDragging(false);
     setDraggedItem(null);
   };
@@ -1237,7 +1278,7 @@ function RoomScene({ fov }: { fov: number }) {
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointerleave', onUp);
     };
-  }, [isDragging, draggedItem, items]);
+  }, [isDragging, draggedItem, items, ceilingItems]);
 
   // Room center for outdoor environment positioning
   const roomCenter: [number, number] = [bbox.width / 2, bbox.depth / 2];
@@ -1252,8 +1293,8 @@ function RoomScene({ fov }: { fov: number }) {
         near={0.1}
       />
 
-      {/* First-person controls: WASD movement + mouse drag to look */}
-      <FirstPersonControls speed={0.2} />
+      {/* First-person controls: WASD movement + mouse drag to look (disabled while dragging items) */}
+      <FirstPersonControls speed={0.2} disabledRef={isDraggingRef} />
 
       {/* Lighting - realistic interior setup */}
       {/* Ambient light for general illumination - consistent base level */}
@@ -1313,7 +1354,7 @@ function RoomScene({ fov }: { fov: number }) {
           key={item.id}
           onPointerDown={(e) => {
             e.stopPropagation();
-            handlePointerDown(item.id);
+            handleFurniturePointerDown(item.id);
           }}
         >
           <FurnitureItem3D
@@ -1325,34 +1366,29 @@ function RoomScene({ fov }: { fov: number }) {
       ))}
 
       {/* Ceiling items (lights and fans) */}
-      {ceilingItems.map((item) =>
-        item.type === "ceilingLight" ? (
-          <CeilingLightModel
-            key={item.id}
-            item={item}
-            isSelected={item.id === selectedCeilingItemId}
-            onSelect={() => selectCeilingItem(item.id)}
-          />
-        ) : (
-          <CeilingFanModel
-            key={item.id}
-            item={item}
-            isSelected={item.id === selectedCeilingItemId}
-            onSelect={() => selectCeilingItem(item.id)}
-          />
-        )
-      )}
-
-      {/* Click on floor to deselect */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[bbox.width / 2, -0.01, bbox.depth / 2]}
-        onClick={() => { selectItem(null); selectCeilingItem(null); }}
-        visible={false}
-      >
-        <planeGeometry args={[bbox.width * 3, bbox.depth * 3]} />
-        <meshBasicMaterial />
-      </mesh>
+      {ceilingItems.map((item) => (
+        <group
+          key={item.id}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            handleCeilingPointerDown(item.id);
+          }}
+        >
+          {item.type === "ceilingLight" ? (
+            <CeilingLightModel
+              item={item}
+              isSelected={item.id === selectedCeilingItemId}
+              onSelect={() => selectCeilingItem(item.id)}
+            />
+          ) : (
+            <CeilingFanModel
+              item={item}
+              isSelected={item.id === selectedCeilingItemId}
+              onSelect={() => selectCeilingItem(item.id)}
+            />
+          )}
+        </group>
+      ))}
 
     </>
   );
@@ -1360,6 +1396,12 @@ function RoomScene({ fov }: { fov: number }) {
 
 export default function Room3DView() {
   const [fov, setFov] = useState(90);
+  const { selectItem } = useRoomStore();
+
+  // Deselect when clicking on empty space
+  const handlePointerMissed = () => {
+    selectItem(null);
+  };
 
   return (
     <div className="relative rounded-2xl border bg-gray-900 shadow-lg select-none overflow-hidden w-full h-full min-h-[600px]">
@@ -1389,6 +1431,7 @@ export default function Room3DView() {
         }}
         dpr={[1, 2]}
         style={{ width: "100%", height: "100%", minHeight: 600, display: "block" }}
+        onPointerMissed={handlePointerMissed}
       >
         <color attach="background" args={["#87ceeb"]} />
         <fog attach="fog" args={["#a8c8e8", 30, 80]} />
