@@ -529,31 +529,46 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
       : wallIndex % 2 === 0 ? dims.width : dims.depth;
 
     const widthAsPercent = width / wallLength;
+    const halfWidthRatio = widthAsPercent / 2;
 
-    // Find first non-overlapping position
-    let position = 0.15;
+    // Minimum and maximum positions to keep opening fully within wall bounds
+    const minPos = halfWidthRatio;
+    const maxPos = 1 - halfWidthRatio;
+
+    // Find first non-overlapping position, starting from center of valid range
+    let position = Math.max(minPos, 0.5); // Start at center or minPos if opening is very wide
     const step = 0.1;
-    while (position < 0.85) {
+
+    // Try to find a non-overlapping position
+    let found = false;
+    for (let tryPos = minPos; tryPos <= maxPos; tryPos += step) {
       const overlaps = existingOnWall.some(o => {
         const oWidthPercent = o.width / wallLength;
         const oStart = o.position - oWidthPercent / 2;
         const oEnd = o.position + oWidthPercent / 2;
-        const newStart = position - widthAsPercent / 2;
-        const newEnd = position + widthAsPercent / 2;
+        const newStart = tryPos - halfWidthRatio;
+        const newEnd = tryPos + halfWidthRatio;
         return !(newEnd < oStart || newStart > oEnd);
       });
-      if (!overlaps) break;
-      position += step;
+      if (!overlaps) {
+        position = tryPos;
+        found = true;
+        break;
+      }
     }
+
+    // Clamp to valid range
+    position = Math.max(minPos, Math.min(maxPos, position));
 
     const opening: WallOpening = {
       id: nanoid(),
       type,
       wallIndex,
-      position: Math.min(0.85, Math.max(0.15, position)),
+      position,
       width,
       height: type === "door" ? 7 : 3,
       fromFloor: type === "door" ? 0 : 3,
+      swingDirection: type === "door" ? "left" : undefined,
     };
     set((state) => ({
       ...state,

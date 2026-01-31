@@ -224,9 +224,7 @@ export default function PropertiesPanel({ compact = false }: PropertiesPanelProp
         </div>
       ) : (
         <div className="text-sm opacity-70">
-          {editMode === "ceiling"
-            ? "Select a ceiling item to edit its properties."
-            : "Select an item or opening to edit its properties."}
+          Select an item to edit its properties.
         </div>
       )}
 

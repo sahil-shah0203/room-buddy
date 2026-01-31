@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
-import type { Item, Vertex, FurnitureType, WallOpening } from "@/types/room";
+import type { Item, Vertex, FurnitureType, WallOpening, CeilingItem } from "@/types/room";
 import { getBoundingBox, shapeToSvgPath } from "@/lib/geometry/polygon";
 
 // Furniture styling configuration
@@ -22,16 +22,19 @@ type DragState =
   | { type: "drag"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } }
   | { type: "vertex"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } }
   | { type: "resize"; id: string; handle: string; startPx: { x: number; y: number }; startItem: { x: number; y: number; w: number; d: number } }
-  | { type: "opening"; id: string; mode: "move" | "resize-left" | "resize-right"; wallIndex: number; startPx: { x: number; y: number }; startPos: number; startWidth: number };
+  | { type: "opening"; id: string; mode: "move" | "resize-left" | "resize-right"; wallIndex: number; startPx: { x: number; y: number }; startPos: number; startWidth: number }
+  | { type: "ceiling"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } };
 
 export default function RoomCanvas() {
   const {
     room,
     items,
     openings,
+    ceilingItems,
     selectedItemId,
     selectedVertexId,
     selectedOpeningId,
+    selectedCeilingItemId,
     gridSize,
     editMode,
     selectItem,
@@ -42,6 +45,8 @@ export default function RoomCanvas() {
     addVertex,
     selectOpening,
     updateOpening,
+    selectCeilingItem,
+    moveCeilingItem,
   } = useRoomStore();
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -143,6 +148,25 @@ export default function RoomCanvas() {
     });
   }
 
+  function onPointerDownCeilingItem(e: React.PointerEvent, item: CeilingItem) {
+    if (editMode !== "ceiling") return;
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
+    selectCeilingItem(item.id);
+
+    const bounds = wrapRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const px = { x: e.clientX - bounds.left - 20, y: e.clientY - bounds.top - 20 };
+    setDrag({
+      type: "ceiling",
+      id: item.id,
+      startPx: px,
+      startRoom: { x: item.x, y: item.y },
+    });
+  }
+
   function onPointerMove(e: React.PointerEvent) {
     if (drag.type === "none") return;
 
@@ -155,6 +179,10 @@ export default function RoomCanvas() {
       const dxRoom = pxToRoom(px.x - drag.startPx.x);
       const dyRoom = pxToRoom(px.y - drag.startPx.y);
       moveItem(drag.id, drag.startRoom.x + dxRoom, drag.startRoom.y + dyRoom, { snap: true });
+    } else if (drag.type === "ceiling") {
+      const dxRoom = pxToRoom(px.x - drag.startPx.x);
+      const dyRoom = pxToRoom(px.y - drag.startPx.y);
+      moveCeilingItem(drag.id, drag.startRoom.x + dxRoom, drag.startRoom.y + dyRoom);
     } else if (drag.type === "vertex") {
       const dxRoom = pxToRoom(px.x - drag.startPx.x);
       const dyRoom = pxToRoom(px.y - drag.startPx.y);
@@ -284,6 +312,8 @@ export default function RoomCanvas() {
   function onCanvasClick() {
     if (editMode === "furniture") {
       selectItem(null);
+    } else if (editMode === "ceiling") {
+      selectCeilingItem(null);
     } else {
       selectVertex(null);
       selectOpening(null);
@@ -594,6 +624,120 @@ export default function RoomCanvas() {
     );
   }
 
+  // Render ceiling item (light or fan)
+  function renderCeilingItem(item: CeilingItem) {
+    const isSelected = item.id === selectedCeilingItemId && editMode === "ceiling";
+    const radiusPx = roomToPx(item.size / 2);
+    const cx = roomToPx(item.x);
+    const cy = roomToPx(item.y);
+
+    const isFan = item.type === "ceilingFan";
+    const baseColor = isFan ? "#4a5568" : "#e2e8f0";
+    const iconColor = isFan ? "#718096" : item.lightColor;
+
+    return (
+      <g
+        key={item.id}
+        transform={`translate(${cx},${cy})`}
+        onPointerDown={(e) => onPointerDownCeilingItem(e, item)}
+        style={{ cursor: editMode === "ceiling" ? "grab" : "default" }}
+      >
+        {/* Glow effect for lights that are on (not for fans) */}
+        {item.isOn && !isFan && (
+          <circle
+            r={radiusPx * 1.5}
+            fill={item.lightColor}
+            opacity={0.3}
+            style={{ pointerEvents: "none" }}
+          />
+        )}
+
+        {/* Selection ring */}
+        {isSelected && (
+          <circle
+            r={radiusPx + 6}
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth={3}
+            strokeDasharray="6 3"
+          />
+        )}
+
+        {/* Main circle (fixture body) */}
+        <circle
+          r={radiusPx}
+          fill={baseColor}
+          stroke={isSelected ? "#000" : "#94a3b8"}
+          strokeWidth={isSelected ? 2 : 1}
+        />
+
+        {/* Inner details */}
+        {isFan ? (
+          // Fan blades
+          <>
+            {[0, 72, 144, 216, 288].map((angle, i) => (
+              <ellipse
+                key={i}
+                cx={0}
+                cy={-radiusPx * 0.5}
+                rx={radiusPx * 0.15}
+                ry={radiusPx * 0.4}
+                fill={iconColor}
+                transform={`rotate(${angle})`}
+                style={{ pointerEvents: "none" }}
+              />
+            ))}
+            {/* Center hub */}
+            <circle r={radiusPx * 0.2} fill="#2d3748" style={{ pointerEvents: "none" }} />
+          </>
+        ) : (
+          // Light fixture
+          <>
+            <circle
+              r={radiusPx * 0.6}
+              fill={item.isOn ? item.lightColor : "#cbd5e0"}
+              opacity={item.isOn ? 0.9 : 0.5}
+              style={{ pointerEvents: "none" }}
+            />
+            {item.isOn && (
+              <circle
+                r={radiusPx * 0.3}
+                fill="#ffffff"
+                opacity={0.7}
+                style={{ pointerEvents: "none" }}
+              />
+            )}
+          </>
+        )}
+
+        {/* Label */}
+        <text
+          y={radiusPx + 16}
+          fontSize={11}
+          fontWeight={500}
+          fill="#374151"
+          textAnchor="middle"
+          style={{ pointerEvents: "none" }}
+        >
+          {item.label ?? (isFan ? "Fan" : "Light")}
+        </text>
+
+        {/* On/Off indicator (only for lights, not fans) */}
+        {!isFan && (
+          <circle
+            cx={radiusPx - 4}
+            cy={-radiusPx + 4}
+            r={5}
+            fill={item.isOn ? "#10b981" : "#6b7280"}
+            stroke="white"
+            strokeWidth={1.5}
+            style={{ pointerEvents: "none" }}
+          />
+        )}
+      </g>
+    );
+  }
+
   return (
     <div
       ref={wrapRef}
@@ -658,8 +802,11 @@ export default function RoomCanvas() {
           {/* Wall openings (doors/windows) - rendered on top of edge targets */}
           {openings.map((opening) => renderOpening(opening))}
 
-          {/* Furniture items */}
-          {items.map((it) => renderFurnitureItem(it))}
+          {/* Furniture items - only show in furniture mode */}
+          {editMode === "furniture" && items.map((it) => renderFurnitureItem(it))}
+
+          {/* Ceiling items - only show in ceiling mode */}
+          {editMode === "ceiling" && ceilingItems.map((it) => renderCeilingItem(it))}
 
           {/* Vertex handles */}
           {editMode === "shape" && room.shape.type === "polygon" && (

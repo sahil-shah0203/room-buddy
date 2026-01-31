@@ -311,12 +311,23 @@ function RugModel({ w, d, color }: { w: number; d: number; color: string }) {
 }
 
 // Ceiling light fixture
-function CeilingLightModel({ item }: { item: CeilingItem }) {
+function CeilingLightModel({ item, isSelected, onSelect }: { item: CeilingItem; isSelected?: boolean; onSelect?: () => void }) {
   const fixtureHeight = 0.3;
   const radius = item.size / 2;
 
   return (
-    <group position={[item.x, WALL_HEIGHT - fixtureHeight / 2, item.y]}>
+    <group
+      position={[item.x, WALL_HEIGHT - fixtureHeight / 2, item.y]}
+      onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
+    >
+      {/* Selection ring */}
+      {isSelected && (
+        <mesh position={[0, -0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius + 0.1, radius + 0.2, 32]} />
+          <meshBasicMaterial color="#fbbf24" side={2} />
+        </mesh>
+      )}
+
       {/* Fixture base (flush with ceiling) */}
       <mesh>
         <cylinderGeometry args={[radius * 0.3, radius * 0.4, 0.1, 32]} />
@@ -348,7 +359,7 @@ function CeilingLightModel({ item }: { item: CeilingItem }) {
       {item.isOn && (
         <pointLight
           position={[0, -0.5, 0]}
-          intensity={item.lightIntensity * 3}
+          intensity={0.5 + item.lightIntensity * 2.5}
           color={item.lightColor}
           castShadow
           distance={30}
@@ -363,14 +374,26 @@ function CeilingLightModel({ item }: { item: CeilingItem }) {
 }
 
 // Ceiling fan (no light)
-function CeilingFanModel({ item }: { item: CeilingItem }) {
+function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; isSelected?: boolean; onSelect?: () => void }) {
   const hubRadius = 0.3;
   const bladeLength = item.size / 2 - hubRadius;
   const bladeWidth = 0.4;
   const dropHeight = 0.8;
+  const fanRadius = item.size / 2;
 
   return (
-    <group position={[item.x, WALL_HEIGHT - dropHeight, item.y]}>
+    <group
+      position={[item.x, WALL_HEIGHT - dropHeight, item.y]}
+      onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
+    >
+      {/* Selection ring */}
+      {isSelected && (
+        <mesh position={[0, -dropHeight / 2 - 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[fanRadius + 0.1, fanRadius + 0.2, 32]} />
+          <meshBasicMaterial color="#fbbf24" side={2} />
+        </mesh>
+      )}
+
       {/* Mounting rod */}
       <mesh castShadow>
         <cylinderGeometry args={[0.05, 0.05, dropHeight, 8]} />
@@ -1147,7 +1170,7 @@ function Ceiling({ vertices, height = WALL_HEIGHT, ceilingColor }: { vertices: {
 }
 
 function RoomScene({ fov }: { fov: number }) {
-  const { room, items, selectedItemId, selectItem, moveItem, openings, appearance, ceilingItems } = useRoomStore();
+  const { room, items, selectedItemId, selectItem, moveItem, openings, appearance, ceilingItems, selectedCeilingItemId, selectCeilingItem } = useRoomStore();
   const [isDragging, setIsDragging] = useState(false);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const { camera, raycaster, gl } = useThree();
@@ -1233,8 +1256,8 @@ function RoomScene({ fov }: { fov: number }) {
       <FirstPersonControls speed={0.2} />
 
       {/* Lighting - realistic interior setup */}
-      {/* Ambient light for general illumination */}
-      <ambientLight intensity={ceilingItems.some(c => c.isOn) ? 0.15 : 0.25} color="#b4c6e0" />
+      {/* Ambient light for general illumination - consistent base level */}
+      <ambientLight intensity={0.2} color="#b4c6e0" />
 
       {/* Noon sun - directly above, casts shadows that respect solid structures */}
       {/* Light passes through windows (transparent) but blocked by ceiling, walls, doors */}
@@ -1253,7 +1276,7 @@ function RoomScene({ fov }: { fov: number }) {
       />
 
       {/* Sky/ground bounce light - subtle blue from sky, warm from floor */}
-      <hemisphereLight args={["#87ceeb", "#f5e6d3", ceilingItems.some(c => c.isOn) ? 0.2 : 0.4]} />
+      <hemisphereLight args={["#87ceeb", "#f5e6d3", 0.3]} />
 
       {/* Soft fill lights simulating indirect light (no shadows) */}
       <pointLight position={[1, 3, 1]} intensity={0.08} color="#fff8f0" distance={15} decay={2} castShadow={false} />
@@ -1304,9 +1327,19 @@ function RoomScene({ fov }: { fov: number }) {
       {/* Ceiling items (lights and fans) */}
       {ceilingItems.map((item) =>
         item.type === "ceilingLight" ? (
-          <CeilingLightModel key={item.id} item={item} />
+          <CeilingLightModel
+            key={item.id}
+            item={item}
+            isSelected={item.id === selectedCeilingItemId}
+            onSelect={() => selectCeilingItem(item.id)}
+          />
         ) : (
-          <CeilingFanModel key={item.id} item={item} />
+          <CeilingFanModel
+            key={item.id}
+            item={item}
+            isSelected={item.id === selectedCeilingItemId}
+            onSelect={() => selectCeilingItem(item.id)}
+          />
         )
       )}
 
@@ -1314,7 +1347,7 @@ function RoomScene({ fov }: { fov: number }) {
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[bbox.width / 2, -0.01, bbox.depth / 2]}
-        onClick={() => selectItem(null)}
+        onClick={() => { selectItem(null); selectCeilingItem(null); }}
         visible={false}
       >
         <planeGeometry args={[bbox.width * 3, bbox.depth * 3]} />

@@ -67,6 +67,7 @@ export type WallOpening = {
   width: number; // in room units
   height: number; // in room units
   fromFloor: number; // distance from floor (0 for doors)
+  swingDirection?: "left" | "right"; // which way door swings (only for doors)
 };
 
 // Room appearance settings

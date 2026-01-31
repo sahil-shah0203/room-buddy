@@ -50,16 +50,44 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
   const vertexCount = vertices.length || 4;
   const wallCount = vertexCount;
 
+  // Canvas and coordinate setup - EXACT same logic as original RoomCanvas
   const canvasPx = 700;
   const bbox = useMemo(() => getBoundingBox(room.shape), [room.shape]);
+
   const scale = useMemo(() => {
     const maxDim = Math.max(bbox.width, bbox.depth);
-    return (canvasPx - 80) / maxDim;
+    return (canvasPx - 40) / maxDim;
   }, [bbox.width, bbox.depth]);
+
+  function roomToPx(v: number) {
+    return v * scale;
+  }
+  function pxToRoom(v: number) {
+    return v / scale;
+  }
+
   const roomPath = useMemo(() => shapeToSvgPath(room.shape, scale), [room.shape, scale]);
 
-  function roomToPx(v: number) { return v * scale; }
-  function pxToRoom(v: number) { return v / scale; }
+  const gridLines = useMemo(() => {
+    const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (let x = bbox.minX; x <= bbox.maxX; x += gridSize) {
+      lines.push({
+        x1: roomToPx(x),
+        y1: roomToPx(bbox.minY),
+        x2: roomToPx(x),
+        y2: roomToPx(bbox.maxY),
+      });
+    }
+    for (let y = bbox.minY; y <= bbox.maxY; y += gridSize) {
+      lines.push({
+        x1: roomToPx(bbox.minX),
+        y1: roomToPx(y),
+        x2: roomToPx(bbox.maxX),
+        y2: roomToPx(y),
+      });
+    }
+    return lines;
+  }, [bbox, gridSize, scale]);
 
   // Enable shape editing mode and handle keyboard
   useEffect(() => {
@@ -83,10 +111,13 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     };
   }, [setEditMode, selectedVertexId, selectedOpeningId, vertexCount, removeVertex, removeOpening]);
 
-  // Wall geometry helper
+  // Get wall info for opening calculations - EXACT same as original
   function getWallInfo(wallIndex: number) {
     const verts = room.shape.type === "polygon" ? room.shape.vertices : [
-      { x: 0, y: 0 }, { x: 12, y: 0 }, { x: 12, y: 10 }, { x: 0, y: 10 },
+      { x: 0, y: 0 },
+      { x: 12, y: 0 },
+      { x: 12, y: 10 },
+      { x: 0, y: 10 },
     ];
     const start = verts[wallIndex];
     const end = verts[(wallIndex + 1) % verts.length];
@@ -97,10 +128,13 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     return { start, end, dx, dy, length, angle };
   }
 
-  // Find closest wall for dragging openings around corners
+  // Find the closest wall and position for a point - EXACT same as original
   function findClosestWallPosition(point: { x: number; y: number }, openingWidth: number): { wallIndex: number; position: number } {
     const verts = room.shape.type === "polygon" ? room.shape.vertices : [
-      { x: 0, y: 0 }, { x: 12, y: 0 }, { x: 12, y: 10 }, { x: 0, y: 10 },
+      { x: 0, y: 0 },
+      { x: 12, y: 0 },
+      { x: 12, y: 10 },
+      { x: 0, y: 10 },
     ];
 
     let bestWall = 0;
@@ -135,67 +169,87 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     return { wallIndex: bestWall, position: bestPosition };
   }
 
-  // Pointer handlers
-  function onPointerDownVertex(e: React.PointerEvent, v: Vertex) {
+  // Pointer handlers - EXACT same logic as original
+  function onPointerDownVertex(e: React.PointerEvent, vertex: Vertex) {
     e.stopPropagation();
-    (e.currentTarget as SVGElement).setPointerCapture?.(e.pointerId);
-    selectVertex(v.id);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
+    selectVertex(vertex.id);
+
     const bounds = wrapRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const px = { x: e.clientX - bounds.left, y: e.clientY - bounds.top };
-    setDrag({ type: "vertex", id: v.id, startPx: px, startRoom: { x: v.x, y: v.y } });
+
+    const px = { x: e.clientX - bounds.left - 40, y: e.clientY - bounds.top - 40 };
+    setDrag({
+      type: "vertex",
+      id: vertex.id,
+      startPx: px,
+      startRoom: { x: vertex.x, y: vertex.y },
+    });
   }
 
   function onPointerDownOpening(e: React.PointerEvent, opening: WallOpening, mode: "move" | "resize-left" | "resize-right") {
     e.stopPropagation();
-    (e.currentTarget as SVGElement).setPointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
     selectOpening(opening.id);
+
     const bounds = wrapRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const px = { x: e.clientX - bounds.left, y: e.clientY - bounds.top };
-    setDrag({ type: "opening", id: opening.id, mode, wallIndex: opening.wallIndex, startPx: px, startPos: opening.position, startWidth: opening.width });
+
+    const px = { x: e.clientX - bounds.left - 40, y: e.clientY - bounds.top - 40 };
+    setDrag({
+      type: "opening",
+      id: opening.id,
+      mode,
+      wallIndex: opening.wallIndex,
+      startPx: px,
+      startPos: opening.position,
+      startWidth: opening.width,
+    });
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (drag.type === "none") return;
+
     const bounds = wrapRef.current?.getBoundingClientRect();
     if (!bounds) return;
+
     const px = { x: e.clientX - bounds.left - 40, y: e.clientY - bounds.top - 40 };
 
     if (drag.type === "vertex") {
-      const dxRoom = pxToRoom(px.x - drag.startPx.x + 40);
-      const dyRoom = pxToRoom(px.y - drag.startPx.y + 40);
+      const dxRoom = pxToRoom(px.x - drag.startPx.x);
+      const dyRoom = pxToRoom(px.y - drag.startPx.y);
       const snappedX = Math.round((drag.startRoom.x + dxRoom) / gridSize) * gridSize;
       const snappedY = Math.round((drag.startRoom.y + dyRoom) / gridSize) * gridSize;
       moveVertex(drag.id, snappedX, snappedY);
-    }
-
-    if (drag.type === "opening") {
+    } else if (drag.type === "opening") {
       const mouseRoom = { x: pxToRoom(px.x), y: pxToRoom(px.y) };
       const opening = openings.find(o => o.id === drag.id);
       if (!opening) return;
 
       if (drag.mode === "move") {
-        // Find closest wall - allows dragging around corners
         const { wallIndex, position } = findClosestWallPosition(mouseRoom, opening.width);
         updateOpening(drag.id, { wallIndex, position });
       } else {
-        // Resize mode
         const wall = getWallInfo(drag.wallIndex);
-        const dxPx = (px.x + 40) - drag.startPx.x;
-        const dyPx = (px.y + 40) - drag.startPx.y;
+        const dxPx = px.x - drag.startPx.x;
+        const dyPx = px.y - drag.startPx.y;
+
         const wallDirX = Math.cos(wall.angle);
         const wallDirY = Math.sin(wall.angle);
-        const moveAlongWall = pxToRoom(dxPx) * wallDirX + pxToRoom(dyPx) * wallDirY;
+        const moveAlongWall = (pxToRoom(dxPx) * wallDirX + pxToRoom(dyPx) * wallDirY);
 
         if (drag.mode === "resize-left") {
-          const newWidth = Math.max(1, drag.startWidth - moveAlongWall);
+          const widthDelta = -moveAlongWall;
+          const newWidth = Math.max(1, drag.startWidth + widthDelta);
           const halfWidthRatio = (newWidth / 2) / wall.length;
           const posDelta = (newWidth - drag.startWidth) / wall.length / 2;
           const newPos = Math.max(halfWidthRatio, Math.min(1 - halfWidthRatio, drag.startPos - posDelta));
           updateOpening(drag.id, { width: newWidth, position: newPos });
-        } else {
-          const newWidth = Math.max(1, drag.startWidth + moveAlongWall);
+        } else if (drag.mode === "resize-right") {
+          const widthDelta = moveAlongWall;
+          const newWidth = Math.max(1, drag.startWidth + widthDelta);
           const halfWidthRatio = (newWidth / 2) / wall.length;
           const posDelta = (newWidth - drag.startWidth) / wall.length / 2;
           const newPos = Math.max(halfWidthRatio, Math.min(1 - halfWidthRatio, drag.startPos + posDelta));
@@ -212,11 +266,16 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
   function onEdgeClick(e: React.PointerEvent, edgeIndex: number) {
     if (room.shape.type !== "polygon") return;
     e.stopPropagation();
+
     const bounds = wrapRef.current?.getBoundingClientRect();
     if (!bounds) return;
+
     const px = { x: e.clientX - bounds.left - 40, y: e.clientY - bounds.top - 40 };
-    const snappedX = Math.round(pxToRoom(px.x) / gridSize) * gridSize;
-    const snappedY = Math.round(pxToRoom(px.y) / gridSize) * gridSize;
+    const roomPoint = { x: pxToRoom(px.x), y: pxToRoom(px.y) };
+
+    const snappedX = Math.round(roomPoint.x / gridSize) * gridSize;
+    const snappedY = Math.round(roomPoint.y / gridSize) * gridSize;
+
     const startVertex = room.shape.vertices[edgeIndex];
     addVertex(startVertex.id, snappedX, snappedY);
   }
@@ -226,51 +285,142 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     selectOpening(null);
   }
 
-  // Render opening
+  // Render wall opening - EXACT same as original
   function renderOpening(opening: WallOpening) {
     const wall = getWallInfo(opening.wallIndex);
     const isSelected = opening.id === selectedOpeningId;
+
     const centerAlongWall = wall.length * opening.position;
     const halfWidth = opening.width / 2;
+    const startAlongWall = centerAlongWall - halfWidth;
+
     const cos = Math.cos(wall.angle);
     const sin = Math.sin(wall.angle);
 
-    const x1 = roomToPx(wall.start.x + cos * (centerAlongWall - halfWidth));
-    const y1 = roomToPx(wall.start.y + sin * (centerAlongWall - halfWidth));
-    const x2 = roomToPx(wall.start.x + cos * (centerAlongWall + halfWidth));
-    const y2 = roomToPx(wall.start.y + sin * (centerAlongWall + halfWidth));
+    const centerX = wall.start.x + cos * centerAlongWall;
+    const centerY = wall.start.y + sin * centerAlongWall;
+
+    const startX = wall.start.x + cos * startAlongWall;
+    const startY = wall.start.y + sin * startAlongWall;
+    const endX = wall.start.x + cos * (startAlongWall + opening.width);
+    const endY = wall.start.y + sin * (startAlongWall + opening.width);
 
     const isDoor = opening.type === "door";
-    const color = isDoor ? "#8B4513" : "#87CEEB";
+    const color = isDoor ? "#8B4513" : "#87ceeb";
+    const strokeColor = isDoor ? "#654321" : "#4a90d9";
 
     return (
       <g key={opening.id}>
-        {isSelected && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fbbf24" strokeWidth={14} strokeLinecap="round" opacity={0.5} />}
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={isSelected ? 8 : 6} strokeLinecap="round" style={{ cursor: "grab" }} onPointerDown={(e) => onPointerDownOpening(e, opening, "move")} />
+        {/* Invisible wide hit area for easier dragging */}
+        <line
+          x1={roomToPx(startX)}
+          y1={roomToPx(startY)}
+          x2={roomToPx(endX)}
+          y2={roomToPx(endY)}
+          stroke="transparent"
+          strokeWidth={24}
+          strokeLinecap="round"
+          style={{ cursor: "grab" }}
+          onPointerDown={(e) => onPointerDownOpening(e, opening, "move")}
+        />
+
+        {/* Border/highlight */}
+        <line
+          x1={roomToPx(startX)}
+          y1={roomToPx(startY)}
+          x2={roomToPx(endX)}
+          y2={roomToPx(endY)}
+          stroke={isSelected ? "#000" : strokeColor}
+          strokeWidth={isSelected ? 10 : 8}
+          strokeLinecap="round"
+          style={{ pointerEvents: "none" }}
+        />
+        {/* Opening line on wall (visible) */}
+        <line
+          x1={roomToPx(startX)}
+          y1={roomToPx(startY)}
+          x2={roomToPx(endX)}
+          y2={roomToPx(endY)}
+          stroke={color}
+          strokeWidth={isSelected ? 6 : 4}
+          strokeLinecap="round"
+          style={{ pointerEvents: "none" }}
+        />
+
+        {/* Door swing arc indicator */}
+        {isDoor && (() => {
+          const swingLeft = opening.swingDirection !== "right";
+          const hingeX = swingLeft ? startX : endX;
+          const hingeY = swingLeft ? startY : endY;
+          const swingDir = swingLeft ? 1 : -1;
+          return (
+            <path
+              d={`M ${roomToPx(hingeX)} ${roomToPx(hingeY)}
+                  A ${roomToPx(opening.width)} ${roomToPx(opening.width)} 0 0 ${swingLeft ? 1 : 0}
+                  ${roomToPx(hingeX + cos * opening.width * swingDir - sin * opening.width * 0.7)}
+                  ${roomToPx(hingeY + sin * opening.width * swingDir + cos * opening.width * 0.7)}`}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={1.5}
+              strokeDasharray="4 2"
+              style={{ pointerEvents: "none" }}
+            />
+          );
+        })()}
+
+        {/* Window cross pattern */}
+        {!isDoor && (
+          <line
+            x1={roomToPx(centerX)}
+            y1={roomToPx(centerY - 0.15)}
+            x2={roomToPx(centerX)}
+            y2={roomToPx(centerY + 0.15)}
+            stroke="white"
+            strokeWidth={2}
+            style={{ pointerEvents: "none" }}
+          />
+        )}
+
+        {/* Label */}
+        <text
+          x={roomToPx(centerX)}
+          y={roomToPx(centerY) - 12}
+          fontSize={10}
+          fill="#333"
+          textAnchor="middle"
+          style={{ pointerEvents: "none" }}
+        >
+          {isDoor ? "Door" : "Window"} ({opening.width.toFixed(1)})
+        </text>
+
+        {/* Resize handles when selected */}
         {isSelected && (
           <>
-            <circle cx={x1} cy={y1} r={7} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: "ew-resize" }} onPointerDown={(e) => onPointerDownOpening(e, opening, "resize-left")} />
-            <circle cx={x2} cy={y2} r={7} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: "ew-resize" }} onPointerDown={(e) => onPointerDownOpening(e, opening, "resize-right")} />
+            <circle
+              cx={roomToPx(startX)}
+              cy={roomToPx(startY)}
+              r={6}
+              fill="white"
+              stroke="#000"
+              strokeWidth={2}
+              style={{ cursor: "ew-resize" }}
+              onPointerDown={(e) => onPointerDownOpening(e, opening, "resize-left")}
+            />
+            <circle
+              cx={roomToPx(endX)}
+              cy={roomToPx(endY)}
+              r={6}
+              fill="white"
+              stroke="#000"
+              strokeWidth={2}
+              style={{ cursor: "ew-resize" }}
+              onPointerDown={(e) => onPointerDownOpening(e, opening, "resize-right")}
+            />
           </>
         )}
-        <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 14} fontSize={12} fill="#374151" textAnchor="middle" fontWeight={500} style={{ pointerEvents: "none" }}>
-          {isDoor ? "Door" : "Window"}
-        </text>
       </g>
     );
   }
-
-  // Grid lines
-  const gridLines = useMemo(() => {
-    const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
-    for (let x = bbox.minX; x <= bbox.maxX; x += gridSize) {
-      lines.push({ x1: roomToPx(x), y1: roomToPx(bbox.minY), x2: roomToPx(x), y2: roomToPx(bbox.maxY) });
-    }
-    for (let y = bbox.minY; y <= bbox.maxY; y += gridSize) {
-      lines.push({ x1: roomToPx(bbox.minX), y1: roomToPx(y), x2: roomToPx(bbox.maxX), y2: roomToPx(y) });
-    }
-    return lines;
-  }, [bbox, gridSize, scale]);
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -290,48 +440,110 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden min-h-0">
-          {/* Canvas */}
-          <div
-            ref={wrapRef}
-            className="flex-1 bg-gray-100 flex items-center justify-center overflow-auto"
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerDown={onCanvasClick}
-          >
-            <svg width={canvasPx} height={canvasPx} className="block bg-white rounded-xl shadow-sm border">
-              <defs>
-                <clipPath id="room-clip-setup">
-                  <path d={roomPath} transform="translate(40,40)" />
-                </clipPath>
-              </defs>
-              <g transform="translate(40,40)">
-                {/* Grid */}
-                <g opacity={0.12} clipPath="url(#room-clip-setup)">
-                  {gridLines.map((ln, i) => <line key={i} x1={ln.x1} y1={ln.y1} x2={ln.x2} y2={ln.y2} stroke="#64748b" strokeWidth={1} />)}
-                </g>
-                {/* Room */}
-                <path d={roomPath} fill="#f8fafc" stroke="#334155" strokeWidth={2} />
-                {/* Edge targets for adding vertices */}
-                {vertices.map((v, i) => {
-                  const next = vertices[(i + 1) % vertices.length];
-                  return <line key={`edge-${i}`} x1={roomToPx(v.x)} y1={roomToPx(v.y)} x2={roomToPx(next.x)} y2={roomToPx(next.y)} stroke="transparent" strokeWidth={24} style={{ cursor: "crosshair" }} onPointerDown={(e) => onEdgeClick(e, i)} />;
-                })}
-                {/* Openings */}
-                {openings.map(renderOpening)}
-                {/* Wall labels */}
-                {vertices.map((v, i) => {
-                  const next = vertices[(i + 1) % vertices.length];
-                  return <text key={`w-${i}`} x={roomToPx((v.x + next.x) / 2)} y={roomToPx((v.y + next.y) / 2)} fontSize={13} fill="#9ca3af" textAnchor="middle" dominantBaseline="middle" style={{ pointerEvents: "none" }}>W{i + 1}</text>;
-                })}
-                {/* Vertices */}
-                {vertices.map((v, i) => (
-                  <g key={v.id}>
-                    <circle cx={roomToPx(v.x)} cy={roomToPx(v.y)} r={v.id === selectedVertexId ? 11 : 9} fill={v.id === selectedVertexId ? "#3b82f6" : "#6b7280"} stroke="white" strokeWidth={2} style={{ cursor: "grab" }} onPointerDown={(e) => onPointerDownVertex(e, v)} />
-                    <text x={roomToPx(v.x)} y={roomToPx(v.y) - 16} fontSize={12} fill="#374151" textAnchor="middle" fontWeight={600} style={{ pointerEvents: "none" }}>{i + 1}</text>
+          {/* Canvas - ref on the SVG wrapper, not outer div */}
+          <div className="flex-1 bg-gray-100 flex items-center justify-center overflow-auto">
+            <div
+              ref={wrapRef}
+              className="bg-white rounded-xl shadow-sm border select-none"
+              style={{ padding: 20 }}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerDown={onCanvasClick}
+            >
+              <svg width={canvasPx} height={canvasPx} className="block overflow-visible">
+                <defs>
+                  <clipPath id="room-clip-setup">
+                    <path d={roomPath} />
+                  </clipPath>
+                </defs>
+
+                <g transform="translate(20,20)">
+                  {/* Grid */}
+                  <g opacity={0.2} clipPath="url(#room-clip-setup)">
+                    {gridLines.map((ln, i) => (
+                      <line key={i} x1={ln.x1} y1={ln.y1} x2={ln.x2} y2={ln.y2} stroke="#94a3b8" strokeWidth={1} />
+                    ))}
                   </g>
-                ))}
-              </g>
-            </svg>
+
+                  {/* Room boundary */}
+                  <path d={roomPath} fill="#f8fafc" stroke="#334155" strokeWidth={2} />
+
+                  {/* Edge click targets for adding vertices */}
+                  <g>
+                    {vertices.map((v, i) => {
+                      const next = vertices[(i + 1) % vertices.length];
+                      return (
+                        <line
+                          key={`edge-${i}`}
+                          x1={roomToPx(v.x)}
+                          y1={roomToPx(v.y)}
+                          x2={roomToPx(next.x)}
+                          y2={roomToPx(next.y)}
+                          stroke="transparent"
+                          strokeWidth={16}
+                          style={{ cursor: "crosshair" }}
+                          onPointerDown={(e) => onEdgeClick(e, i)}
+                        />
+                      );
+                    })}
+                  </g>
+
+                  {/* Wall openings */}
+                  {openings.map((opening) => renderOpening(opening))}
+
+                  {/* Wall labels */}
+                  {vertices.map((v, i) => {
+                    const next = vertices[(i + 1) % vertices.length];
+                    return (
+                      <text
+                        key={`w-${i}`}
+                        x={roomToPx((v.x + next.x) / 2)}
+                        y={roomToPx((v.y + next.y) / 2)}
+                        fontSize={13}
+                        fill="#9ca3af"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        style={{ pointerEvents: "none" }}
+                      >
+                        W{i + 1}
+                      </text>
+                    );
+                  })}
+
+                  {/* Vertex handles */}
+                  <g>
+                    {vertices.map((v, i) => {
+                      const isSelected = v.id === selectedVertexId;
+                      return (
+                        <g key={v.id}>
+                          <circle
+                            cx={roomToPx(v.x)}
+                            cy={roomToPx(v.y)}
+                            r={isSelected ? 10 : 8}
+                            fill={isSelected ? "#3b82f6" : "#6b7280"}
+                            stroke="white"
+                            strokeWidth={2}
+                            style={{ cursor: "grab" }}
+                            onPointerDown={(e) => onPointerDownVertex(e, v)}
+                          />
+                          <text
+                            x={roomToPx(v.x)}
+                            y={roomToPx(v.y) - 14}
+                            fontSize={11}
+                            fill="#374151"
+                            textAnchor="middle"
+                            fontWeight={600}
+                            style={{ pointerEvents: "none" }}
+                          >
+                            {i + 1}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </g>
+                </g>
+              </svg>
+            </div>
           </div>
 
           {/* Right panel */}
@@ -343,7 +555,7 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
                 { id: "openings", label: "Doors & Windows" },
                 { id: "appearance", label: "Colors" },
               ].map((tab) => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 px-3 py-3 text-sm font-medium ${activeTab === tab.id ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as typeof activeTab)} className={`flex-1 px-3 py-3 text-sm font-medium ${activeTab === tab.id ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
                   {tab.label}
                 </button>
               ))}
@@ -399,6 +611,30 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
                       ))}
                     </div>
                   )}
+                  {/* Door swing controls */}
+                  {(() => {
+                    const selectedOpening = openings.find(o => o.id === selectedOpeningId);
+                    if (!selectedOpening || selectedOpening.type !== "door") return null;
+                    return (
+                      <div className="pt-4 border-t">
+                        <div className="text-sm font-medium text-gray-700 mb-2">Door Swing</div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateOpening(selectedOpening.id, { swingDirection: "left" })}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ${selectedOpening.swingDirection !== "right" ? "bg-blue-100 text-blue-800 border-2 border-blue-500" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                          >
+                            ↰ Swing Left
+                          </button>
+                          <button
+                            onClick={() => updateOpening(selectedOpening.id, { swingDirection: "right" })}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium ${selectedOpening.swingDirection === "right" ? "bg-blue-100 text-blue-800 border-2 border-blue-500" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                          >
+                            Swing Right ↱
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
