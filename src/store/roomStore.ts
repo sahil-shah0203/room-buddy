@@ -9,6 +9,17 @@ import { getBoundingBox } from "@/lib/geometry/polygon";
 
 type PresetShape = "rectangle" | "l-shape" | "u-shape";
 
+// Template type for room presets
+export type RoomTemplate = {
+  id: string;
+  name: string;
+  shape: RoomShape;
+  items: Omit<Item, "id">[];
+  ceilingItems: Omit<CeilingItem, "id">[];
+  openings: Omit<WallOpening, "id">[];
+  appearance?: Partial<RoomAppearance>;
+};
+
 type Actions = {
   setRoom: (width: number, depth: number, unit?: RoomState["room"]["unit"]) => void;
   setGridSize: (gridSize: number) => void;
@@ -70,6 +81,9 @@ type Actions = {
   selectCeilingItem: (id: string | null) => void;
   updateCeilingItem: (id: string, updates: Partial<Omit<CeilingItem, "id" | "type">>) => void;
   toggleCeilingLight: (id: string) => void;
+
+  // Templates
+  applyTemplate: (template: RoomTemplate) => void;
 };
 
 const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string }> = {
@@ -140,8 +154,13 @@ function createPresetShape(preset: PresetShape, width: number, depth: number): R
 }
 
 function wouldCollide(state: RoomState, candidate: Item): boolean {
+  // Rugs can overlap with anything - skip collision check if candidate is a rug
+  if (candidate.type === "rug") return false;
+
   for (const it of state.items) {
     if (it.id === candidate.id) continue;
+    // Skip rugs - furniture can be placed on top of rugs
+    if (it.type === "rug") continue;
     if (rectsOverlap(it, candidate)) return true;
   }
   return false;
@@ -464,8 +483,10 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const moved = nextItems.find((it) => it.id === id);
     if (!moved) return;
 
-    // Check collision with other items
-    const collides = nextItems.some((it) => it.id !== id && rectsOverlap(it, moved));
+    // Check collision with other items (rugs can overlap with anything)
+    const collides = moved.type !== "rug" && nextItems.some((it) =>
+      it.id !== id && it.type !== "rug" && rectsOverlap(it, moved)
+    );
     if (collides) return;
 
     // Check if placement is valid within the room shape
@@ -487,7 +508,10 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const rotated = next.find((it) => it.id === id);
     if (!rotated) return;
 
-    const collides = next.some((it) => it.id !== id && rectsOverlap(it, rotated));
+    // Check collision (rugs can overlap with anything)
+    const collides = rotated.type !== "rug" && next.some((it) =>
+      it.id !== id && it.type !== "rug" && rectsOverlap(it, rotated)
+    );
     if (collides) return;
 
     // Check if placement is valid within the room shape
@@ -507,7 +531,10 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const resized = next.find((it) => it.id === id);
     if (!resized) return;
 
-    const collides = next.some((it) => it.id !== id && rectsOverlap(it, resized));
+    // Check collision (rugs can overlap with anything)
+    const collides = resized.type !== "rug" && next.some((it) =>
+      it.id !== id && it.type !== "rug" && rectsOverlap(it, resized)
+    );
     if (collides) return;
 
     // Check if placement is valid within the room shape
@@ -716,4 +743,47 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
         item.id === id ? { ...item, isOn: !item.isOn } : item
       ),
     })),
+
+  // Apply a complete room template
+  applyTemplate: (template) =>
+    set((s) => {
+      // Regenerate vertex IDs to avoid conflicts
+      const newShape: RoomShape = template.shape.type === "polygon"
+        ? {
+            type: "polygon",
+            vertices: template.shape.vertices.map((v) => ({
+              ...v,
+              id: nanoid(),
+            })),
+          }
+        : template.shape;
+
+      return {
+        ...s,
+        room: {
+          ...s.room,
+          shape: newShape,
+        },
+        items: template.items.map((item) => ({
+          ...item,
+          id: nanoid(),
+        })),
+        ceilingItems: template.ceilingItems.map((item) => ({
+          ...item,
+          id: nanoid(),
+        })),
+        openings: template.openings.map((opening) => ({
+          ...opening,
+          id: nanoid(),
+        })),
+        appearance: {
+          ...s.appearance,
+          ...template.appearance,
+        },
+        selectedItemId: null,
+        selectedCeilingItemId: null,
+        selectedOpeningId: null,
+        selectedVertexId: null,
+      };
+    }),
 }));

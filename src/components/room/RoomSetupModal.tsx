@@ -1,10 +1,153 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useRoomStore } from "@/store/roomStore";
+import { useRoomStore, type RoomTemplate } from "@/store/roomStore";
 import { getRoomDimensions } from "@/lib/geometry/collision";
 import { getBoundingBox, shapeToSvgPath } from "@/lib/geometry/polygon";
 import type { FloorType, Vertex, WallOpening } from "@/types/room";
+import { nanoid } from "nanoid";
+
+// Room templates
+// Rules: No furniture overlaps except rug (which can be under other furniture)
+// All labels use standard component names (no custom labels)
+const ROOM_TEMPLATES: RoomTemplate[] = [
+  {
+    id: "bedroom",
+    name: "Bedroom",
+    shape: {
+      type: "polygon",
+      vertices: [
+        { id: "v1", x: 0, y: 0 },
+        { id: "v2", x: 14, y: 0 },
+        { id: "v3", x: 14, y: 12 },
+        { id: "v4", x: 0, y: 12 },
+      ],
+    },
+    items: [
+      { type: "rug", label: "Rug", x: 3, y: 5, w: 8, d: 5, rotation: 0 },
+      { type: "bed", label: "Bed", x: 4.5, y: 0.5, w: 5, d: 6.5, rotation: 0 },
+      { type: "table", label: "Table", x: 2, y: 0.5, w: 2, d: 2, rotation: 0 },
+      // Dresser flush with right and bottom walls, drawers facing left (toward bed) - rotation 90
+      { type: "dresser", label: "Dresser", x: 12, y: 8, w: 2, d: 4, rotation: 90 },
+    ],
+    ceilingItems: [
+      { type: "ceilingLight", label: "Ceiling Light", x: 7, y: 6, size: 1.5, lightColor: "#fff5e6", lightIntensity: 0.8, isOn: true },
+    ],
+    openings: [
+      { type: "door", wallIndex: 3, position: 0.2, width: 3, height: 7, fromFloor: 0, swingDirection: "left" },
+      { type: "window", wallIndex: 1, position: 0.5, width: 4, height: 4, fromFloor: 3 },
+    ],
+    appearance: { floorType: "wood", floorColor: "#c4a77d" },
+  },
+  {
+    id: "living-room",
+    name: "Living Room",
+    shape: {
+      type: "polygon",
+      vertices: [
+        { id: "v1", x: 0, y: 0 },
+        { id: "v2", x: 10, y: 0 },
+        { id: "v3", x: 10, y: 6 },
+        { id: "v4", x: 18, y: 6 },
+        { id: "v5", x: 18, y: 14 },
+        { id: "v6", x: 0, y: 14 },
+      ],
+    },
+    items: [
+      { type: "rug", label: "Rug", x: 1, y: 4, w: 8, d: 6, rotation: 0 },
+      { type: "tvStand", label: "TV Stand", x: 2.5, y: 0.5, w: 5, d: 1.5, rotation: 0 },
+      // Sofa facing TV (rotation 180)
+      { type: "sofa", label: "Sofa", x: 1.5, y: 7, w: 7, d: 3, rotation: 180 },
+      { type: "table", label: "Table", x: 3, y: 4, w: 4, d: 2, rotation: 0 },
+      // Desk and chair moved left to make room for door
+      { type: "desk", label: "Desk", x: 10.5, y: 6.5, w: 4, d: 2, rotation: 0 },
+      { type: "chair", label: "Chair", x: 11.5, y: 9, w: 2, d: 2, rotation: 0 },
+    ],
+    ceilingItems: [
+      { type: "ceilingLight", label: "Ceiling Light", x: 5, y: 7, size: 2, lightColor: "#ffffff", lightIntensity: 0.9, isOn: true },
+      { type: "ceilingFan", label: "Ceiling Fan", x: 14, y: 10, size: 4, lightColor: "#ffffff", lightIntensity: 0, isOn: false },
+    ],
+    openings: [
+      { type: "door", wallIndex: 3, position: 0.7, width: 3, height: 7, fromFloor: 0, swingDirection: "right" },
+      { type: "window", wallIndex: 5, position: 0.5, width: 6, height: 4, fromFloor: 3 },
+    ],
+    appearance: { floorType: "wood", floorColor: "#b89470" },
+  },
+  {
+    id: "home-office",
+    name: "Home Office",
+    shape: {
+      type: "polygon",
+      vertices: [
+        { id: "v1", x: 0, y: 0 },
+        { id: "v2", x: 12, y: 0 },
+        { id: "v3", x: 12, y: 10 },
+        { id: "v4", x: 0, y: 10 },
+      ],
+    },
+    items: [
+      { type: "rug", label: "Rug", x: 1, y: 4, w: 6, d: 5, rotation: 0 },
+      { type: "desk", label: "Desk", x: 0.5, y: 0.5, w: 5, d: 2.5, rotation: 0 },
+      // Chair centered with desk, rotated 180 to face the desk
+      { type: "chair", label: "Chair", x: 2, y: 3.5, w: 2, d: 2, rotation: 180 },
+      { type: "dresser", label: "Dresser", x: 9, y: 0.5, w: 2.5, d: 2, rotation: 0 },
+      { type: "table", label: "Table", x: 9, y: 7, w: 2.5, d: 2.5, rotation: 0 },
+    ],
+    ceilingItems: [
+      { type: "ceilingLight", label: "Ceiling Light", x: 6, y: 5, size: 1.5, lightColor: "#f5f5f5", lightIntensity: 1, isOn: true },
+    ],
+    openings: [
+      { type: "door", wallIndex: 2, position: 0.8, width: 3, height: 7, fromFloor: 0, swingDirection: "left" },
+      { type: "window", wallIndex: 0, position: 0.35, width: 4, height: 4, fromFloor: 3 },
+    ],
+    appearance: { floorType: "carpet", floorColor: "#8b9dc3" },
+  },
+  {
+    id: "studio",
+    name: "Studio Apartment",
+    shape: {
+      type: "polygon",
+      vertices: [
+        // U-shape: top-left room, top-right room, connected at bottom
+        { id: "v1", x: 0, y: 0 },
+        { id: "v2", x: 6, y: 0 },
+        { id: "v3", x: 6, y: 5 },
+        { id: "v4", x: 14, y: 5 },
+        { id: "v5", x: 14, y: 0 },
+        { id: "v6", x: 20, y: 0 },
+        { id: "v7", x: 20, y: 16 },
+        { id: "v8", x: 0, y: 16 },
+      ],
+    },
+    items: [
+      // Rug in living area only
+      { type: "rug", label: "Rug", x: 1, y: 7, w: 7, d: 6, rotation: 0 },
+      // Bedroom area (top right)
+      { type: "bed", label: "Bed", x: 14.5, y: 0.5, w: 5, d: 6.5, rotation: 0 },
+      // Dresser flush against top wall (y=5 is the internal wall)
+      { type: "dresser", label: "Dresser", x: 8, y: 5, w: 4, d: 2, rotation: 0 },
+      // Top left room: dining area - chairs rotated 180 to face table, positioned above table
+      { type: "table", label: "Table", x: 1, y: 1.5, w: 4, d: 2.5, rotation: 0 },
+      { type: "chair", label: "Chair", x: 1.5, y: 0, w: 2, d: 1.5, rotation: 180 },
+      { type: "chair", label: "Chair", x: 3.5, y: 0, w: 2, d: 1.5, rotation: 180 },
+      // Living area: sofa facing TV (bottom wall), TV flush against bottom wall
+      { type: "tvStand", label: "TV Stand", x: 2, y: 14.5, w: 5, d: 1.5, rotation: 0 },
+      { type: "sofa", label: "Sofa", x: 1.5, y: 10, w: 6, d: 3, rotation: 0 },
+    ],
+    ceilingItems: [
+      { type: "ceilingLight", label: "Ceiling Light", x: 4, y: 11, size: 2, lightColor: "#fff8e7", lightIntensity: 0.8, isOn: true },
+      { type: "ceilingLight", label: "Ceiling Light", x: 17, y: 4, size: 1.5, lightColor: "#fff5e6", lightIntensity: 0.7, isOn: true },
+      { type: "ceilingLight", label: "Ceiling Light", x: 3, y: 2.5, size: 1.2, lightColor: "#ffffff", lightIntensity: 0.7, isOn: true },
+    ],
+    openings: [
+      // Door bottom right
+      { type: "door", wallIndex: 6, position: 0.15, width: 3, height: 7, fromFloor: 0, swingDirection: "right" },
+      { type: "window", wallIndex: 0, position: 0.5, width: 3, height: 4, fromFloor: 3 },
+      { type: "window", wallIndex: 5, position: 0.5, width: 5, height: 4, fromFloor: 3 },
+    ],
+    appearance: { floorType: "wood", floorColor: "#d4b896" },
+  },
+];
 
 interface RoomSetupModalProps {
   onClose: () => void;
@@ -38,9 +181,10 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     selectedOpeningId,
     selectOpening,
     setEditMode,
+    applyTemplate,
   } = useRoomStore();
 
-  const [activeTab, setActiveTab] = useState<"shape" | "openings" | "appearance">("shape");
+  const [activeTab, setActiveTab] = useState<"templates" | "shape" | "openings" | "appearance">("templates");
   const [selectedWall, setSelectedWall] = useState(0);
   const [drag, setDrag] = useState<DragState>({ type: "none" });
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -551,6 +695,7 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
             {/* Tabs */}
             <div className="flex border-b shrink-0">
               {[
+                { id: "templates", label: "Templates" },
                 { id: "shape", label: "Shape" },
                 { id: "openings", label: "Doors & Windows" },
                 { id: "appearance", label: "Colors" },
@@ -563,6 +708,68 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto p-5">
+              {activeTab === "templates" && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
+                    Choose a template to quickly set up your room with furniture, lighting, and openings.
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {ROOM_TEMPLATES.map((template) => {
+                      // Generate mini SVG preview
+                      const templateBbox = getBoundingBox(template.shape);
+                      const previewSize = 120;
+                      const previewScale = (previewSize - 20) / Math.max(templateBbox.width, templateBbox.depth);
+                      const previewPath = shapeToSvgPath(template.shape, previewScale);
+
+                      return (
+                        <button
+                          key={template.id}
+                          onClick={() => applyTemplate(template)}
+                          className="flex flex-col items-center p-3 border-2 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-all group"
+                        >
+                          <div className="bg-gray-100 rounded-lg p-2 mb-2 group-hover:bg-white transition-colors">
+                            <svg width={previewSize} height={previewSize} className="block">
+                              <g transform="translate(10,10)">
+                                {/* Room shape */}
+                                <path d={previewPath} fill="#f1f5f9" stroke="#64748b" strokeWidth={1.5} />
+
+                                {/* Furniture dots */}
+                                {template.items.map((item, i) => (
+                                  <rect
+                                    key={i}
+                                    x={(item.x + item.w / 2) * previewScale - 3}
+                                    y={(item.y + item.d / 2) * previewScale - 3}
+                                    width={6}
+                                    height={6}
+                                    rx={1}
+                                    fill={item.type === "bed" ? "#3b82f6" : item.type === "sofa" ? "#8b5cf6" : item.type === "desk" ? "#f59e0b" : "#6b7280"}
+                                  />
+                                ))}
+
+                                {/* Ceiling light indicators */}
+                                {template.ceilingItems.filter(c => c.type === "ceilingLight").map((item, i) => (
+                                  <circle
+                                    key={`light-${i}`}
+                                    cx={item.x * previewScale}
+                                    cy={item.y * previewScale}
+                                    r={4}
+                                    fill="#fbbf24"
+                                    stroke="#f59e0b"
+                                    strokeWidth={1}
+                                  />
+                                ))}
+                              </g>
+                            </svg>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700">{template.name}</span>
+                          <span className="text-xs text-gray-400">{template.items.length} items · {template.ceilingItems.length} lights</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {activeTab === "shape" && (
                 <div className="space-y-5">
                   <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
