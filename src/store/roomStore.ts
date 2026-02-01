@@ -97,6 +97,10 @@ type Actions = {
   updateCeilingItem: (id: string, updates: Partial<Omit<CeilingItem, "id" | "type">>) => void;
   toggleCeilingLight: (id: string) => void;
 
+  // Variants
+  setItemVariant: (id: string, variant: string) => void;
+  setCeilingItemVariant: (id: string, variant: string) => void;
+
   // Templates
   applyTemplate: (template: RoomTemplate) => void;
 
@@ -760,6 +764,23 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
       ...s,
       ceilingItems: s.ceilingItems.map((item) =>
         item.id === id ? { ...item, isOn: !item.isOn } : item
+      ),
+    })),
+
+  // Variants
+  setItemVariant: (id, variant) =>
+    set((s) => ({
+      ...s,
+      items: s.items.map((item) =>
+        item.id === id ? { ...item, variant } : item
+      ),
+    })),
+
+  setCeilingItemVariant: (id, variant) =>
+    set((s) => ({
+      ...s,
+      ceilingItems: s.ceilingItems.map((item) =>
+        item.id === id ? { ...item, variant } : item
       ),
     })),
 

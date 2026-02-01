@@ -37,7 +37,8 @@
       "y": 5,
       "w": 8,
       "d": 5,
-      "rotation": 0
+      "rotation": 0,
+      "variant": "default"
     },
     {
       "type": "bed",
@@ -46,7 +47,8 @@
       "y": 0.5,
       "w": 5,
       "d": 6.5,
-      "rotation": 0
+      "rotation": 0,
+      "variant": "default"
     },
     {
       "type": "table",
@@ -55,7 +57,8 @@
       "y": 0.5,
       "w": 2,
       "d": 2,
-      "rotation": 0
+      "rotation": 0,
+      "variant": "default"
     },
     {
       "type": "dresser",
@@ -64,7 +67,8 @@
       "y": 7.5,
       "w": 4,
       "d": 2,
-      "rotation": 90
+      "rotation": 90,
+      "variant": "default"
     }
   ],
   "ceilingItems": [
@@ -76,7 +80,8 @@
       "size": 1.5,
       "lightColor": "#fff5e6",
       "lightIntensity": 0.8,
-      "isOn": true
+      "isOn": true,
+      "variant": "default"
     }
   ],
   "openings": [

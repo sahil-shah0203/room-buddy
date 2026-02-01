@@ -2,7 +2,12 @@
 
 import { useMemo } from "react";
 import { useRoomStore } from "@/store/roomStore";
-import type { FloorType } from "@/types/room";
+import type { FloorType, FurnitureType, CeilingItemType } from "@/types/room";
+import {
+  getVariantsForType,
+  getCeilingVariantsForType,
+  type VariantInfo,
+} from "@/lib/furniture/variants";
 
 // Default furniture colors (matching 3D view)
 const FURNITURE_COLORS: Record<string, string> = {
@@ -20,6 +25,49 @@ interface PropertiesPanelProps {
   compact?: boolean;
 }
 
+// Variant selector component
+function VariantSelector({
+  variants,
+  currentVariant,
+  onChange,
+}: {
+  variants: VariantInfo[];
+  currentVariant: string;
+  onChange: (variant: string) => void;
+}) {
+  if (variants.length <= 1) return null;
+
+  return (
+    <div>
+      <label className="text-xs opacity-70">Style Variant</label>
+      <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
+        {variants.map((variant) => {
+          const isSelected = variant.id === currentVariant;
+          return (
+            <button
+              key={variant.id}
+              onClick={() => onChange(variant.id)}
+              className={`flex-shrink-0 rounded-lg border-2 px-3 py-2 text-left transition-all ${
+                isSelected
+                  ? "border-blue-500 bg-blue-50"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+              title={variant.description}
+            >
+              <div className={`text-xs font-medium ${isSelected ? "text-blue-700" : "text-gray-700"}`}>
+                {variant.label}
+              </div>
+              <div className="text-xs text-gray-500 truncate max-w-20">
+                {variant.description}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function PropertiesPanel({ compact = false }: PropertiesPanelProps) {
   const {
     items,
@@ -32,6 +80,8 @@ export default function PropertiesPanel({ compact = false }: PropertiesPanelProp
     rotateItem,
     resizeItem,
     setItemColor,
+    setItemVariant,
+    setCeilingItemVariant,
     updateOpening,
     updateCeilingItem,
     toggleCeilingLight,
@@ -57,6 +107,13 @@ export default function PropertiesPanel({ compact = false }: PropertiesPanelProp
             <div className="text-sm font-medium">{selected.label ?? selected.type}</div>
             <div className="text-xs opacity-60">Rotation: {selected.rotation}°</div>
           </div>
+
+          {/* Variant selector */}
+          <VariantSelector
+            variants={getVariantsForType(selected.type as FurnitureType)}
+            currentVariant={selected.variant || "default"}
+            onChange={(variant) => setItemVariant(selected.id, variant)}
+          />
 
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -156,6 +213,13 @@ export default function PropertiesPanel({ compact = false }: PropertiesPanelProp
           <div className="text-sm font-semibold text-gray-700">
             Selected {selectedCeilingItem.type === "ceilingFan" ? "Ceiling Fan" : "Ceiling Light"}
           </div>
+
+          {/* Variant selector */}
+          <VariantSelector
+            variants={getCeilingVariantsForType(selectedCeilingItem.type as CeilingItemType)}
+            currentVariant={selectedCeilingItem.variant || "default"}
+            onChange={(variant) => setCeilingItemVariant(selectedCeilingItem.id, variant)}
+          />
 
           <div>
             <label className="text-xs opacity-70">Size (diameter)</label>

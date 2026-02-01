@@ -16,16 +16,16 @@
     "unit": "ft"
   },
   "items": [
-    { "type": "rug", "label": "Rug", "x": 1, "y": 7.5, "w": 8, "d": 6, "rotation": 0 },
-    { "type": "tvStand", "label": "TV Stand", "x": 2.5, "y": 0.5, "w": 5, "d": 1.5, "rotation": 0 },
-    { "type": "sofa", "label": "Sofa", "x": 1.5, "y": 10.5, "w": 7, "d": 3, "rotation": 180 },
-    { "type": "table", "label": "Table", "x": 3, "y": 5.5, "w": 4, "d": 2, "rotation": 0 },
-    { "type": "desk", "label": "Desk", "x": 10.5, "y": 6.5, "w": 4, "d": 2, "rotation": 0 },
-    { "type": "chair", "label": "Chair", "x": 11.5, "y": 9, "w": 2, "d": 2, "rotation": 180 }
+    { "type": "rug", "label": "Rug", "x": 1, "y": 7.5, "w": 8, "d": 6, "rotation": 0, "variant": "default" },
+    { "type": "tvStand", "label": "TV Stand", "x": 2.5, "y": 0.5, "w": 5, "d": 1.5, "rotation": 0, "variant": "default" },
+    { "type": "sofa", "label": "Sofa", "x": 1.5, "y": 10.5, "w": 7, "d": 3, "rotation": 180, "variant": "default" },
+    { "type": "table", "label": "Table", "x": 3, "y": 5.5, "w": 4, "d": 2, "rotation": 0, "variant": "default" },
+    { "type": "desk", "label": "Desk", "x": 10.5, "y": 6.5, "w": 4, "d": 2, "rotation": 0, "variant": "default" },
+    { "type": "chair", "label": "Chair", "x": 11.5, "y": 9, "w": 2, "d": 2, "rotation": 180, "variant": "default" }
   ],
   "ceilingItems": [
-    { "type": "ceilingLight", "label": "Ceiling Light", "x": 5, "y": 7, "size": 2, "lightColor": "#ffffff", "lightIntensity": 0.9, "isOn": true },
-    { "type": "ceilingFan", "label": "Ceiling Fan", "x": 14, "y": 10, "size": 4, "lightColor": "#ffffff", "lightIntensity": 0, "isOn": false }
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 5, "y": 7, "size": 2, "lightColor": "#ffffff", "lightIntensity": 0.9, "isOn": true, "variant": "default" },
+    { "type": "ceilingFan", "label": "Ceiling Fan", "x": 14, "y": 10, "size": 4, "lightColor": "#ffffff", "lightIntensity": 0, "isOn": false, "variant": "default" }
   ],
   "openings": [
     { "type": "door", "wallIndex": 3, "position": 0.7, "width": 3, "height": 7, "fromFloor": 0, "swingDirection": "right" },

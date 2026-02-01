@@ -18,19 +18,19 @@
     "unit": "ft"
   },
   "items": [
-    { "type": "rug", "label": "Rug", "x": 0.5, "y": 7, "w": 7, "d": 6, "rotation": 0 },
-    { "type": "bed", "label": "Bed", "x": 14.5, "y": 0.5, "w": 5, "d": 6.5, "rotation": 0 },
-    { "type": "dresser", "label": "Dresser", "x": 8, "y": 5.5, "w": 4, "d": 2, "rotation": 0 },
-    { "type": "table", "label": "Table", "x": 1, "y": 0.5, "w": 4, "d": 2.5, "rotation": 0 },
-    { "type": "chair", "label": "Chair", "x": 1, "y": 3.5, "w": 2, "d": 1.5, "rotation": 180 },
-    { "type": "chair", "label": "Chair", "x": 3, "y": 3.5, "w": 2, "d": 1.5, "rotation": 180 },
-    { "type": "tvStand", "label": "TV Stand", "x": 1.5, "y": 14, "w": 5, "d": 1.5, "rotation": 0 },
-    { "type": "sofa", "label": "Sofa", "x": 1, "y": 8, "w": 6, "d": 3, "rotation": 0 }
+    { "type": "rug", "label": "Rug", "x": 0.5, "y": 7, "w": 7, "d": 6, "rotation": 0, "variant": "default" },
+    { "type": "bed", "label": "Bed", "x": 14.5, "y": 0.5, "w": 5, "d": 6.5, "rotation": 0, "variant": "default" },
+    { "type": "dresser", "label": "Dresser", "x": 8, "y": 5.5, "w": 4, "d": 2, "rotation": 0, "variant": "default" },
+    { "type": "table", "label": "Table", "x": 1, "y": 0.5, "w": 4, "d": 2.5, "rotation": 0, "variant": "default" },
+    { "type": "chair", "label": "Chair", "x": 1, "y": 3.5, "w": 2, "d": 1.5, "rotation": 180, "variant": "default" },
+    { "type": "chair", "label": "Chair", "x": 3, "y": 3.5, "w": 2, "d": 1.5, "rotation": 180, "variant": "default" },
+    { "type": "tvStand", "label": "TV Stand", "x": 1.5, "y": 14, "w": 5, "d": 1.5, "rotation": 0, "variant": "default" },
+    { "type": "sofa", "label": "Sofa", "x": 1, "y": 8, "w": 6, "d": 3, "rotation": 0, "variant": "default" }
   ],
   "ceilingItems": [
-    { "type": "ceilingLight", "label": "Ceiling Light", "x": 4, "y": 11, "size": 2, "lightColor": "#fff8e7", "lightIntensity": 0.8, "isOn": true },
-    { "type": "ceilingLight", "label": "Ceiling Light", "x": 17, "y": 4, "size": 1.5, "lightColor": "#fff5e6", "lightIntensity": 0.7, "isOn": true },
-    { "type": "ceilingLight", "label": "Ceiling Light", "x": 3, "y": 2.5, "size": 1.2, "lightColor": "#ffffff", "lightIntensity": 0.7, "isOn": true }
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 4, "y": 11, "size": 2, "lightColor": "#fff8e7", "lightIntensity": 0.8, "isOn": true, "variant": "default" },
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 17, "y": 4, "size": 1.5, "lightColor": "#fff5e6", "lightIntensity": 0.7, "isOn": true, "variant": "default" },
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 3, "y": 2.5, "size": 1.2, "lightColor": "#ffffff", "lightIntensity": 0.7, "isOn": true, "variant": "default" }
   ],
   "openings": [
     { "type": "door", "wallIndex": 6, "position": 0.15, "width": 3, "height": 7, "fromFloor": 0, "swingDirection": "right" },

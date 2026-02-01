@@ -10,6 +10,33 @@ export type FurnitureType =
   | "dresser"
   | "tvStand";
 
+// Furniture variants - each type can have different style variants
+export type FurnitureVariant =
+  | "default"
+  | "modern"
+  | "lshaped"
+  | "canopy"
+  | "storage"
+  | "standing"
+  | "ldesk"
+  | "office"
+  | "armchair"
+  | "round"
+  | "coffee"
+  | "runner"
+  | "wide"
+  | "nightstand"
+  | "wallMount"
+  | "entertainment";
+
+// Ceiling item variants
+export type CeilingVariant =
+  | "default"
+  | "pendant"
+  | "chandelier"
+  | "withLight"
+  | "industrial";
+
 // Geometry primitives for polygon support
 export type Point = {
   x: number;
@@ -48,6 +75,7 @@ export type CeilingItem = {
   id: string;
   type: CeilingItemType;
   label?: string;
+  variant?: string;       // style variant (defaults to "default")
   x: number;
   y: number;
   size: number;           // diameter in room units
@@ -84,7 +112,8 @@ export type Item = {
   id: string;
   type: FurnitureType;
   label?: string;
-  color?: string; // custom color override
+  color?: string;   // custom color override
+  variant?: string; // style variant (defaults to "default")
   // dimensions in room units
   w: number;
   d: number;

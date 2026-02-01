@@ -73,11 +73,122 @@ function adjustColor(hex: string, amount: number): string {
 }
 
 // Individual furniture model components
-function BedModel({ w, d, color }: { w: number; d: number; color: string }) {
+function BedModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
   const frameHeight = 0.4;
   const mattressHeight = 0.8;
   const headboardHeight = 2.5;
 
+  // Canopy bed - four-poster frame
+  if (variant === "canopy") {
+    const postHeight = 5;
+    const postSize = 0.2;
+    return (
+      <group>
+        {/* Bed frame */}
+        <mesh position={[0, frameHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w, frameHeight, d]} />
+          <meshStandardMaterial color="#654321" roughness={0.8} />
+        </mesh>
+        {/* Mattress */}
+        <mesh position={[0, frameHeight + mattressHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w - 0.2, mattressHeight, d - 0.2]} />
+          <meshStandardMaterial color="#f5f5f5" roughness={0.9} />
+        </mesh>
+        {/* Four posts */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh key={i} position={[xSign * (w / 2 - postSize / 2), postHeight / 2, zSign * (d / 2 - postSize / 2)]} castShadow>
+            <boxGeometry args={[postSize, postHeight, postSize]} />
+            <meshStandardMaterial color="#4a3728" roughness={0.7} />
+          </mesh>
+        ))}
+        {/* Top frame connecting posts */}
+        <mesh position={[0, postHeight, -d / 2 + postSize / 2]} castShadow>
+          <boxGeometry args={[w, 0.1, postSize]} />
+          <meshStandardMaterial color="#4a3728" roughness={0.7} />
+        </mesh>
+        <mesh position={[0, postHeight, d / 2 - postSize / 2]} castShadow>
+          <boxGeometry args={[w, 0.1, postSize]} />
+          <meshStandardMaterial color="#4a3728" roughness={0.7} />
+        </mesh>
+        <mesh position={[-w / 2 + postSize / 2, postHeight, 0]} castShadow>
+          <boxGeometry args={[postSize, 0.1, d]} />
+          <meshStandardMaterial color="#4a3728" roughness={0.7} />
+        </mesh>
+        <mesh position={[w / 2 - postSize / 2, postHeight, 0]} castShadow>
+          <boxGeometry args={[postSize, 0.1, d]} />
+          <meshStandardMaterial color="#4a3728" roughness={0.7} />
+        </mesh>
+        {/* Pillows */}
+        <mesh position={[-w / 4, frameHeight + mattressHeight + 0.15, -d / 3]} castShadow>
+          <boxGeometry args={[w / 3, 0.3, 0.5]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.95} />
+        </mesh>
+        <mesh position={[w / 4, frameHeight + mattressHeight + 0.15, -d / 3]} castShadow>
+          <boxGeometry args={[w / 3, 0.3, 0.5]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.95} />
+        </mesh>
+        {/* Blanket */}
+        <mesh position={[0, frameHeight + mattressHeight + 0.1, d / 6]} castShadow>
+          <boxGeometry args={[w - 0.3, 0.15, d / 2]} />
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Storage bed - drawers underneath
+  if (variant === "storage") {
+    const drawerHeight = 0.5;
+    return (
+      <group>
+        {/* Higher bed frame with drawer space */}
+        <mesh position={[0, (frameHeight + drawerHeight) / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w, frameHeight + drawerHeight, d]} />
+          <meshStandardMaterial color="#8B4513" roughness={0.8} />
+        </mesh>
+        {/* Drawers on the side */}
+        {[-1, 1].map((sign, i) => (
+          <group key={i}>
+            <mesh position={[sign * (w / 4), drawerHeight / 2, d / 2 + 0.02]} castShadow>
+              <boxGeometry args={[w / 2 - 0.2, drawerHeight - 0.1, 0.05]} />
+              <meshStandardMaterial color="#6b4423" roughness={0.7} />
+            </mesh>
+            {/* Drawer handle */}
+            <mesh position={[sign * (w / 4), drawerHeight / 2, d / 2 + 0.07]} castShadow>
+              <boxGeometry args={[0.4, 0.08, 0.08]} />
+              <meshStandardMaterial color="#888" metalness={0.6} roughness={0.3} />
+            </mesh>
+          </group>
+        ))}
+        {/* Mattress */}
+        <mesh position={[0, frameHeight + drawerHeight + mattressHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w - 0.2, mattressHeight, d - 0.2]} />
+          <meshStandardMaterial color="#f5f5f5" roughness={0.9} />
+        </mesh>
+        {/* Low headboard */}
+        <mesh position={[0, (frameHeight + drawerHeight + 1.5) / 2, -d / 2 + 0.1]} castShadow receiveShadow>
+          <boxGeometry args={[w, 1.5, 0.15]} />
+          <meshStandardMaterial color="#654321" roughness={0.7} />
+        </mesh>
+        {/* Pillows */}
+        <mesh position={[-w / 4, frameHeight + drawerHeight + mattressHeight + 0.15, -d / 3]} castShadow>
+          <boxGeometry args={[w / 3, 0.3, 0.5]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.95} />
+        </mesh>
+        <mesh position={[w / 4, frameHeight + drawerHeight + mattressHeight + 0.15, -d / 3]} castShadow>
+          <boxGeometry args={[w / 3, 0.3, 0.5]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.95} />
+        </mesh>
+        {/* Blanket */}
+        <mesh position={[0, frameHeight + drawerHeight + mattressHeight + 0.1, d / 6]} castShadow>
+          <boxGeometry args={[w - 0.3, 0.15, d / 2]} />
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Default platform bed
   return (
     <group>
       {/* Bed frame */}
@@ -113,11 +224,72 @@ function BedModel({ w, d, color }: { w: number; d: number; color: string }) {
   );
 }
 
-function SofaModel({ w, d, color }: { w: number; d: number; color: string }) {
+function SofaModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
   const seatHeight = 1.2;
   const backHeight = 1.8;
   const armWidth = 0.4;
 
+  // Modern - low-profile, minimalist, no armrests
+  if (variant === "modern") {
+    const lowSeatHeight = 0.8;
+    const lowBackHeight = 1.2;
+    return (
+      <group>
+        {/* Low base */}
+        <RoundedBox args={[w, 0.15, d]} radius={0.02} position={[0, 0.075, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color="#333" roughness={0.6} />
+        </RoundedBox>
+        {/* Seat cushion - full width, no armrests */}
+        <RoundedBox args={[w - 0.2, lowSeatHeight, d - 0.3]} radius={0.08} position={[0, 0.15 + lowSeatHeight / 2, 0.15]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </RoundedBox>
+        {/* Low back cushion */}
+        <RoundedBox args={[w - 0.2, lowBackHeight - lowSeatHeight, 0.4]} radius={0.08} position={[0, 0.15 + lowSeatHeight + (lowBackHeight - lowSeatHeight) / 2 - 0.1, -d / 2 + 0.3]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </RoundedBox>
+      </group>
+    );
+  }
+
+  // L-shaped - corner sectional (proper L shape within bounding box)
+  if (variant === "lshaped") {
+    const mainWidth = w * 0.65;
+    const extensionDepth = d * 0.45;
+    return (
+      <group>
+        {/* Main section seat - along back wall */}
+        <RoundedBox args={[mainWidth, seatHeight, d - 0.3]} radius={0.1} position={[-w / 2 + mainWidth / 2, seatHeight / 2, 0.15]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </RoundedBox>
+        {/* Main back cushion */}
+        <RoundedBox args={[mainWidth, backHeight - seatHeight, 0.5]} radius={0.1} position={[-w / 2 + mainWidth / 2, seatHeight + (backHeight - seatHeight) / 2, -d / 2 + 0.35]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </RoundedBox>
+        {/* Left armrest */}
+        <RoundedBox args={[armWidth, backHeight * 0.7, d]} radius={0.08} position={[-w / 2 + armWidth / 2, backHeight * 0.35, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </RoundedBox>
+        {/* L extension seat - perpendicular piece */}
+        <RoundedBox args={[w - mainWidth + 0.3, seatHeight, extensionDepth]} radius={0.1} position={[w / 2 - (w - mainWidth + 0.3) / 2, seatHeight / 2, d / 2 - extensionDepth / 2]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </RoundedBox>
+        {/* L extension back (side wall) */}
+        <RoundedBox args={[0.5, backHeight - seatHeight, extensionDepth - 0.3]} radius={0.1} position={[w / 2 - 0.35, seatHeight + (backHeight - seatHeight) / 2, d / 2 - extensionDepth / 2]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </RoundedBox>
+        {/* Corner fill piece */}
+        <RoundedBox args={[w - mainWidth + 0.3, seatHeight, d - extensionDepth - 0.3]} radius={0.1} position={[w / 2 - (w - mainWidth + 0.3) / 2, seatHeight / 2, -d / 2 + (d - extensionDepth - 0.3) / 2 + 0.15]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </RoundedBox>
+        {/* Seat cushions */}
+        <RoundedBox args={[mainWidth - 0.3, 0.3, d - 0.6]} radius={0.05} position={[-w / 2 + mainWidth / 2, seatHeight + 0.15, 0.1]} castShadow>
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </RoundedBox>
+      </group>
+    );
+  }
+
+  // Default - standard sectional with armrests
   return (
     <group>
       {/* Base/seat */}
@@ -147,11 +319,109 @@ function SofaModel({ w, d, color }: { w: number; d: number; color: string }) {
   );
 }
 
-function ChairModel({ w, d, color }: { w: number; d: number; color: string }) {
+function ChairModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
   const seatHeight = 1.5;
   const backHeight = 1.2;
   const legRadius = 0.08;
 
+  // Office chair - rolling, high-back, swivel
+  if (variant === "office") {
+    const officeSeatHeight = 1.8;
+    const officeBackHeight = 2;
+    const baseRadius = Math.min(w, d) * 0.45; // Larger base for more visible wheels
+    return (
+      <group>
+        {/* Base hub */}
+        <mesh position={[0, 0.12, 0]} castShadow>
+          <cylinderGeometry args={[0.15, 0.2, 0.08, 16]} />
+          <meshStandardMaterial color="#333" roughness={0.4} metalness={0.6} />
+        </mesh>
+        {/* Wheel legs - extending outward */}
+        {[0, 72, 144, 216, 288].map((angle, i) => (
+          <group key={i} rotation={[0, (angle * Math.PI) / 180, 0]}>
+            {/* Leg arm */}
+            <mesh position={[baseRadius / 2, 0.1, 0]} castShadow>
+              <boxGeometry args={[baseRadius, 0.06, 0.06]} />
+              <meshStandardMaterial color="#333" roughness={0.4} metalness={0.6} />
+            </mesh>
+            {/* Wheel housing */}
+            <mesh position={[baseRadius, 0.08, 0]} castShadow>
+              <boxGeometry args={[0.12, 0.12, 0.1]} />
+              <meshStandardMaterial color="#222" roughness={0.4} metalness={0.6} />
+            </mesh>
+            {/* Wheel */}
+            <mesh position={[baseRadius, 0.05, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+              <cylinderGeometry args={[0.05, 0.05, 0.08, 12]} />
+              <meshStandardMaterial color="#111" roughness={0.3} />
+            </mesh>
+          </group>
+        ))}
+        {/* Center pole */}
+        <mesh position={[0, officeSeatHeight / 2, 0]} castShadow>
+          <cylinderGeometry args={[0.06, 0.08, officeSeatHeight - 0.2, 12]} />
+          <meshStandardMaterial color="#555" roughness={0.4} metalness={0.7} />
+        </mesh>
+        {/* Seat cushion */}
+        <RoundedBox args={[w - 0.1, 0.3, d - 0.1]} radius={0.08} position={[0, officeSeatHeight, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </RoundedBox>
+        {/* High backrest */}
+        <RoundedBox args={[w - 0.2, officeBackHeight, 0.2]} radius={0.08} position={[0, officeSeatHeight + officeBackHeight / 2 + 0.1, -d / 2 + 0.2]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </RoundedBox>
+        {/* Armrests */}
+        {[-1, 1].map((sign, i) => (
+          <group key={i}>
+            <mesh position={[sign * (w / 2 - 0.1), officeSeatHeight + 0.4, 0]} castShadow>
+              <boxGeometry args={[0.08, 0.5, d * 0.5]} />
+              <meshStandardMaterial color="#333" roughness={0.4} />
+            </mesh>
+            <RoundedBox args={[0.12, 0.08, d * 0.4]} radius={0.02} position={[sign * (w / 2 - 0.1), officeSeatHeight + 0.68, 0.05]} castShadow>
+              <meshStandardMaterial color="#444" roughness={0.6} />
+            </RoundedBox>
+          </group>
+        ))}
+      </group>
+    );
+  }
+
+  // Armchair - cushioned, wide
+  if (variant === "armchair") {
+    const armHeight = 1.4;
+    const armWidth = 0.5;
+    const legHeight = 0.4;
+    return (
+      <group>
+        {/* Wooden legs - more visible */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh key={i} position={[xSign * (w / 2 - 0.2), legHeight / 2, zSign * (d / 2 - 0.2)]} castShadow>
+            <boxGeometry args={[0.12, legHeight, 0.12]} />
+            <meshStandardMaterial color="#4a3728" roughness={0.7} />
+          </mesh>
+        ))}
+        {/* Base frame on top of legs */}
+        <RoundedBox args={[w - 0.1, 0.2, d - 0.1]} radius={0.03} position={[0, legHeight + 0.1, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color="#4a3728" roughness={0.8} />
+        </RoundedBox>
+        {/* Seat cushion */}
+        <RoundedBox args={[w - armWidth * 2, 0.4, d - 0.4]} radius={0.1} position={[0, legHeight + 0.4, 0.1]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </RoundedBox>
+        {/* Back cushion */}
+        <RoundedBox args={[w - armWidth * 2, armHeight, 0.4]} radius={0.1} position={[0, legHeight + 0.2 + armHeight / 2 + 0.3, -d / 2 + 0.3]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.9} />
+        </RoundedBox>
+        {/* Armrests */}
+        {[-1, 1].map((sign, i) => (
+          <RoundedBox key={i} args={[armWidth, armHeight * 0.55, d - 0.2]} radius={0.08} position={[sign * (w / 2 - armWidth / 2), legHeight + armHeight * 0.32, 0]} castShadow receiveShadow>
+            <meshStandardMaterial color={color} roughness={0.9} />
+          </RoundedBox>
+        ))}
+      </group>
+    );
+  }
+
+  // Default - simple wooden dining chair
   return (
     <group>
       {/* Seat */}
@@ -173,11 +443,60 @@ function ChairModel({ w, d, color }: { w: number; d: number; color: string }) {
   );
 }
 
-function TableModel({ w, d, color }: { w: number; d: number; color: string }) {
+function TableModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
   const tableHeight = 2.4;
   const topThickness = 0.15;
   const legSize = 0.15;
 
+  // Round table
+  if (variant === "round") {
+    const radius = Math.min(w, d) / 2;
+    return (
+      <group>
+        {/* Round tabletop */}
+        <mesh position={[0, tableHeight, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[radius, radius, topThickness, 32]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.1} />
+        </mesh>
+        {/* Center pedestal */}
+        <mesh position={[0, tableHeight / 2, 0]} castShadow>
+          <cylinderGeometry args={[0.15, 0.2, tableHeight - 0.2, 12]} />
+          <meshStandardMaterial color="#4a4a4a" roughness={0.6} />
+        </mesh>
+        {/* Base */}
+        <mesh position={[0, 0.1, 0]} castShadow>
+          <cylinderGeometry args={[radius * 0.5, radius * 0.6, 0.2, 32]} />
+          <meshStandardMaterial color="#4a4a4a" roughness={0.6} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Coffee table - lower height
+  if (variant === "coffee") {
+    const coffeeHeight = 1.4;
+    return (
+      <group>
+        {/* Tabletop */}
+        <RoundedBox args={[w, topThickness, d]} radius={0.03} position={[0, coffeeHeight, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.1} />
+        </RoundedBox>
+        {/* Lower shelf */}
+        <RoundedBox args={[w - 0.3, 0.08, d - 0.3]} radius={0.02} position={[0, coffeeHeight * 0.3, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </RoundedBox>
+        {/* Short legs */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh key={i} position={[xSign * (w / 2 - 0.15), coffeeHeight / 2, zSign * (d / 2 - 0.15)]} castShadow>
+            <boxGeometry args={[legSize, coffeeHeight, legSize]} />
+            <meshStandardMaterial color="#4a4a4a" roughness={0.6} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  // Default - rectangular table
   return (
     <group>
       {/* Tabletop */}
@@ -195,10 +514,90 @@ function TableModel({ w, d, color }: { w: number; d: number; color: string }) {
   );
 }
 
-function DeskModel({ w, d, color }: { w: number; d: number; color: string }) {
+function DeskModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
   const deskHeight = 2.4;
   const topThickness = 0.12;
 
+  // Standing desk - taller, minimalist
+  if (variant === "standing") {
+    const standingHeight = 3.5;
+    const legSize = 0.1;
+    return (
+      <group>
+        {/* Desktop */}
+        <mesh position={[0, standingHeight, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w, topThickness, d]} />
+          <meshStandardMaterial color={color} roughness={0.4} />
+        </mesh>
+        {/* Metal frame legs */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh key={i} position={[xSign * (w / 2 - 0.15), standingHeight / 2, zSign * (d / 2 - 0.15)]} castShadow>
+            <boxGeometry args={[legSize, standingHeight, legSize]} />
+            <meshStandardMaterial color="#333" roughness={0.4} metalness={0.7} />
+          </mesh>
+        ))}
+        {/* Cross bar under desk */}
+        <mesh position={[0, standingHeight - 0.3, -d / 2 + 0.2]} castShadow>
+          <boxGeometry args={[w - 0.4, 0.08, 0.08]} />
+          <meshStandardMaterial color="#333" roughness={0.4} metalness={0.7} />
+        </mesh>
+        {/* Monitor stand */}
+        <mesh position={[0, standingHeight + 0.15, -d / 4]} castShadow>
+          <boxGeometry args={[w * 0.3, 0.1, d * 0.2]} />
+          <meshStandardMaterial color="#222" roughness={0.5} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // L-desk - corner desk (L shape within bounding box)
+  if (variant === "ldesk") {
+    const mainWidth = w * 0.65;
+    const extensionDepth = d * 0.5;
+    return (
+      <group>
+        {/* Main desktop - along one side */}
+        <mesh position={[-w / 2 + mainWidth / 2, deskHeight, 0]} castShadow receiveShadow>
+          <boxGeometry args={[mainWidth, topThickness, d]} />
+          <meshStandardMaterial color={color} roughness={0.4} />
+        </mesh>
+        {/* Extension desktop - perpendicular */}
+        <mesh position={[w / 2 - (w - mainWidth) / 2, deskHeight, d / 2 - extensionDepth / 2]} castShadow receiveShadow>
+          <boxGeometry args={[w - mainWidth + 0.1, topThickness, extensionDepth]} />
+          <meshStandardMaterial color={color} roughness={0.4} />
+        </mesh>
+        {/* Main left panel with drawers */}
+        <mesh position={[-w / 2 + 0.5, deskHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.9, deskHeight, d - 0.2]} />
+          <meshStandardMaterial color="#5a5a5a" roughness={0.6} />
+        </mesh>
+        {/* Drawer handles on main */}
+        {[0.5, 1.2, 1.9].map((y, i) => (
+          <mesh key={i} position={[-w / 2 + 0.95, y, 0]} castShadow>
+            <boxGeometry args={[0.05, 0.1, 0.3]} />
+            <meshStandardMaterial color="#888" metalness={0.5} roughness={0.3} />
+          </mesh>
+        ))}
+        {/* Corner support leg */}
+        <mesh position={[-w / 2 + mainWidth - 0.1, deskHeight / 2, d / 2 - 0.1]} castShadow receiveShadow>
+          <boxGeometry args={[0.12, deskHeight, 0.12]} />
+          <meshStandardMaterial color="#5a5a5a" roughness={0.6} />
+        </mesh>
+        {/* Extension outer leg */}
+        <mesh position={[w / 2 - 0.1, deskHeight / 2, d / 2 - extensionDepth + 0.1]} castShadow receiveShadow>
+          <boxGeometry args={[0.12, deskHeight, 0.12]} />
+          <meshStandardMaterial color="#5a5a5a" roughness={0.6} />
+        </mesh>
+        {/* Extension back panel */}
+        <mesh position={[w / 2 - (w - mainWidth) / 2, deskHeight / 2, d / 2 - 0.08]} castShadow receiveShadow>
+          <boxGeometry args={[w - mainWidth - 0.1, deskHeight, 0.12]} />
+          <meshStandardMaterial color="#5a5a5a" roughness={0.6} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Default - standard desk with drawers
   return (
     <group>
       {/* Desktop */}
@@ -227,11 +626,95 @@ function DeskModel({ w, d, color }: { w: number; d: number; color: string }) {
   );
 }
 
-function DresserModel({ w, d, color }: { w: number; d: number; color: string }) {
+function DresserModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
   const height = 3.2;
   const drawerCount = 4;
   const drawerHeight = height / drawerCount - 0.08;
 
+  // Wide dresser - low, 6 drawers (2 rows of 3)
+  if (variant === "wide") {
+    const wideHeight = 2;
+    const rowCount = 2;
+    const colCount = 3;
+    const singleDrawerHeight = wideHeight / rowCount - 0.08;
+    const singleDrawerWidth = w / colCount - 0.1;
+    return (
+      <group>
+        {/* Main body */}
+        <mesh position={[0, wideHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w, wideHeight, d]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* Drawer fronts and handles - 2 rows x 3 columns */}
+        {Array.from({ length: rowCount }).map((_, row) => (
+          Array.from({ length: colCount }).map((_, col) => {
+            const y = (row + 0.5) * (wideHeight / rowCount);
+            const x = (col - 1) * (w / colCount);
+            return (
+              <group key={`${row}-${col}`}>
+                <mesh position={[x, y, d / 2 + 0.01]}>
+                  <boxGeometry args={[singleDrawerWidth, singleDrawerHeight, 0.02]} />
+                  <meshStandardMaterial color="#5a5a5a" roughness={0.6} />
+                </mesh>
+                <mesh position={[x, y, d / 2 + 0.05]} castShadow>
+                  <boxGeometry args={[0.25, 0.06, 0.06]} />
+                  <meshStandardMaterial color="#aaa" metalness={0.6} roughness={0.3} />
+                </mesh>
+              </group>
+            );
+          })
+        )).flat()}
+        {/* Small legs */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh key={i} position={[xSign * (w / 2 - 0.1), 0.08, zSign * (d / 2 - 0.1)]} castShadow>
+            <cylinderGeometry args={[0.05, 0.06, 0.16, 8]} />
+            <meshStandardMaterial color="#4a3728" roughness={0.7} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  // Nightstand - small, 2 drawers
+  if (variant === "nightstand") {
+    const nightstandHeight = 2;
+    const nightstandDrawers = 2;
+    const nightDrawerHeight = nightstandHeight / nightstandDrawers - 0.08;
+    return (
+      <group>
+        {/* Main body */}
+        <mesh position={[0, nightstandHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[w, nightstandHeight, d]} />
+          <meshStandardMaterial color={color} roughness={0.7} />
+        </mesh>
+        {/* Drawer fronts and handles */}
+        {Array.from({ length: nightstandDrawers }).map((_, i) => {
+          const y = (i + 0.5) * (nightstandHeight / nightstandDrawers);
+          return (
+            <group key={i}>
+              <mesh position={[0, y, d / 2 + 0.01]}>
+                <boxGeometry args={[w - 0.1, nightDrawerHeight, 0.02]} />
+                <meshStandardMaterial color="#5a5a5a" roughness={0.6} />
+              </mesh>
+              <mesh position={[0, y, d / 2 + 0.05]} castShadow>
+                <boxGeometry args={[0.25, 0.06, 0.06]} />
+                <meshStandardMaterial color="#aaa" metalness={0.6} roughness={0.3} />
+              </mesh>
+            </group>
+          );
+        })}
+        {/* Small legs */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([xSign, zSign], i) => (
+          <mesh key={i} position={[xSign * (w / 2 - 0.1), 0.08, zSign * (d / 2 - 0.1)]} castShadow>
+            <cylinderGeometry args={[0.04, 0.05, 0.16, 8]} />
+            <meshStandardMaterial color="#4a3728" roughness={0.7} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  // Default - tall 4-drawer dresser
   return (
     <group>
       {/* Main body */}
@@ -259,11 +742,92 @@ function DresserModel({ w, d, color }: { w: number; d: number; color: string }) 
   );
 }
 
-function TVStandModel({ w, d, color }: { w: number; d: number; color: string }) {
+function TVStandModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
   const standHeight = 1.5;
   const tvHeight = 2;
   const tvThickness = 0.15;
 
+  // Wall mount - floating shelf, no cabinet
+  if (variant === "wallMount") {
+    const shelfHeight = 3;
+    return (
+      <group>
+        {/* Floating shelf */}
+        <RoundedBox args={[w, 0.15, d]} radius={0.02} position={[0, shelfHeight, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </RoundedBox>
+        {/* Wall mount bracket (visual) */}
+        <mesh position={[0, shelfHeight + tvHeight / 2 + 0.3, -d / 2 + 0.1]} castShadow>
+          <boxGeometry args={[w * 0.3, tvHeight * 0.4, 0.1]} />
+          <meshStandardMaterial color="#333" roughness={0.4} metalness={0.6} />
+        </mesh>
+        {/* TV mounted higher on wall */}
+        <mesh position={[0, shelfHeight + tvHeight / 2 + 0.3, -d / 4]} castShadow receiveShadow>
+          <boxGeometry args={[w * 0.9, tvHeight, tvThickness]} />
+          <meshStandardMaterial color="#111" roughness={0.3} />
+        </mesh>
+        {/* TV screen */}
+        <mesh position={[0, shelfHeight + tvHeight / 2 + 0.3, -d / 4 + tvThickness / 2 + 0.01]}>
+          <boxGeometry args={[w * 0.85, tvHeight - 0.2, 0.01]} />
+          <meshStandardMaterial color="#1a1a2e" roughness={0.1} metalness={0.1} />
+        </mesh>
+        {/* Small devices on shelf */}
+        <mesh position={[-w / 4, shelfHeight + 0.15, 0]} castShadow>
+          <boxGeometry args={[0.6, 0.15, 0.4]} />
+          <meshStandardMaterial color="#222" roughness={0.5} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Entertainment center - large with side shelves
+  if (variant === "entertainment") {
+    const centerHeight = 2;
+    const sideWidth = w * 0.2;
+    const centerWidth = w - sideWidth * 2;
+    return (
+      <group>
+        {/* Center cabinet */}
+        <RoundedBox args={[centerWidth, centerHeight, d]} radius={0.05} position={[0, centerHeight / 2, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </RoundedBox>
+        {/* Left shelving unit */}
+        <RoundedBox args={[sideWidth, centerHeight * 1.3, d - 0.2]} radius={0.03} position={[-centerWidth / 2 - sideWidth / 2, centerHeight * 0.65, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </RoundedBox>
+        {/* Right shelving unit */}
+        <RoundedBox args={[sideWidth, centerHeight * 1.3, d - 0.2]} radius={0.03} position={[centerWidth / 2 + sideWidth / 2, centerHeight * 0.65, 0]} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </RoundedBox>
+        {/* Shelves in side units */}
+        {[-1, 1].map((sign, idx) => (
+          [0.5, 1.3, 2.1].map((y, i) => (
+            <mesh key={`${idx}-${i}`} position={[sign * (centerWidth / 2 + sideWidth / 2), y, 0]}>
+              <boxGeometry args={[sideWidth - 0.1, 0.05, d - 0.3]} />
+              <meshStandardMaterial color="#4a4a4a" roughness={0.6} />
+            </mesh>
+          ))
+        )).flat()}
+        {/* TV */}
+        <mesh position={[0, centerHeight + tvHeight / 2 + 0.1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[centerWidth * 0.9, tvHeight, tvThickness]} />
+          <meshStandardMaterial color="#111" roughness={0.3} />
+        </mesh>
+        {/* TV screen */}
+        <mesh position={[0, centerHeight + tvHeight / 2 + 0.1, tvThickness / 2 + 0.01]}>
+          <boxGeometry args={[centerWidth * 0.85, tvHeight - 0.2, 0.01]} />
+          <meshStandardMaterial color="#1a1a2e" roughness={0.1} metalness={0.1} />
+        </mesh>
+        {/* TV stand/base */}
+        <mesh position={[0, centerHeight + 0.05, 0]} castShadow>
+          <boxGeometry args={[0.6, 0.1, 0.3]} />
+          <meshStandardMaterial color="#222" roughness={0.4} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Default - standard TV cabinet
   return (
     <group>
       {/* Stand cabinet */}
@@ -294,7 +858,56 @@ function TVStandModel({ w, d, color }: { w: number; d: number; color: string }) 
   );
 }
 
-function RugModel({ w, d, color }: { w: number; d: number; color: string }) {
+function RugModel({ w, d, color, variant = "default" }: { w: number; d: number; color: string; variant?: string }) {
+  // Round rug
+  if (variant === "round") {
+    const radius = Math.min(w, d) / 2;
+    return (
+      <group>
+        <mesh position={[0, 0.02, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[radius, 32]} />
+          <meshStandardMaterial color={color} roughness={0.95} />
+        </mesh>
+        {/* Concentric circle pattern */}
+        <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius * 0.6, radius * 0.65, 32]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.95} transparent opacity={0.3} />
+        </mesh>
+        <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius * 0.3, radius * 0.35, 32]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.95} transparent opacity={0.3} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Runner rug - narrow, long with stripe pattern
+  if (variant === "runner") {
+    return (
+      <group>
+        <mesh position={[0, 0.02, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[w, d]} />
+          <meshStandardMaterial color={color} roughness={0.95} />
+        </mesh>
+        {/* Stripe pattern along length */}
+        {[-0.3, 0, 0.3].map((offset, i) => (
+          <mesh key={i} position={[offset * w, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[w * 0.08, d - 0.4]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.95} transparent opacity={0.25} />
+          </mesh>
+        ))}
+        {/* End borders */}
+        {[-1, 1].map((sign, i) => (
+          <mesh key={i} position={[0, 0.025, sign * (d / 2 - 0.15)]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[w - 0.1, 0.2]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.95} transparent opacity={0.3} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  // Default - rectangular rug
   return (
     <group>
       <mesh position={[0, 0.02, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
@@ -314,7 +927,167 @@ function RugModel({ w, d, color }: { w: number; d: number; color: string }) {
 function CeilingLightModel({ item, isSelected, onSelect }: { item: CeilingItem; isSelected?: boolean; onSelect?: () => void }) {
   const fixtureHeight = 0.3;
   const radius = item.size / 2;
+  const variant = item.variant || "default";
 
+  // Pendant light - hanging
+  if (variant === "pendant") {
+    const cordLength = 1.5;
+    return (
+      <group
+        position={[item.x, WALL_HEIGHT, item.y]}
+        onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
+      >
+        {/* Selection ring */}
+        {isSelected && (
+          <mesh position={[0, -cordLength - radius, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[radius + 0.1, radius + 0.2, 32]} />
+            <meshBasicMaterial color="#fbbf24" side={2} />
+          </mesh>
+        )}
+
+        {/* Ceiling mount */}
+        <mesh position={[0, -0.05, 0]}>
+          <cylinderGeometry args={[0.1, 0.1, 0.1, 16]} />
+          <meshStandardMaterial color="#333" roughness={0.4} metalness={0.6} />
+        </mesh>
+
+        {/* Cord */}
+        <mesh position={[0, -cordLength / 2, 0]}>
+          <cylinderGeometry args={[0.02, 0.02, cordLength, 8]} />
+          <meshStandardMaterial color="#222" roughness={0.5} />
+        </mesh>
+
+        {/* Pendant shade - cone shape */}
+        <mesh position={[0, -cordLength - radius * 0.5, 0]}>
+          <coneGeometry args={[radius, radius * 1.2, 32, 1, true]} />
+          <meshStandardMaterial
+            color="#e8e8e8"
+            emissive={item.isOn ? item.lightColor : "#000000"}
+            emissiveIntensity={item.isOn ? 0.3 : 0}
+            roughness={0.4}
+            side={2}
+          />
+        </mesh>
+
+        {/* Bulb inside */}
+        {item.isOn && (
+          <mesh position={[0, -cordLength - radius * 0.3, 0]}>
+            <sphereGeometry args={[radius * 0.25, 16, 16]} />
+            <meshBasicMaterial color={item.lightColor} transparent opacity={0.8} />
+          </mesh>
+        )}
+
+        {/* Point light */}
+        {item.isOn && (
+          <pointLight
+            position={[0, -cordLength - radius * 0.5, 0]}
+            intensity={0.5 + item.lightIntensity * 2.5}
+            color={item.lightColor}
+            castShadow
+            distance={30}
+            decay={1.2}
+            shadow-mapSize={[1024, 1024]}
+            shadow-bias={-0.002}
+            shadow-radius={4}
+          />
+        )}
+      </group>
+    );
+  }
+
+  // Chandelier - decorative with multiple lights
+  if (variant === "chandelier") {
+    const dropHeight = 2;
+    const armCount = 5;
+    const armLength = radius * 0.8;
+    return (
+      <group
+        position={[item.x, WALL_HEIGHT, item.y]}
+        onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
+      >
+        {/* Selection ring */}
+        {isSelected && (
+          <mesh position={[0, -dropHeight - 0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[radius + 0.1, radius + 0.2, 32]} />
+            <meshBasicMaterial color="#fbbf24" side={2} />
+          </mesh>
+        )}
+
+        {/* Ceiling mount */}
+        <mesh position={[0, -0.1, 0]}>
+          <cylinderGeometry args={[0.15, 0.2, 0.2, 16]} />
+          <meshStandardMaterial color="#C0A060" roughness={0.3} metalness={0.7} />
+        </mesh>
+
+        {/* Main chain/rod */}
+        <mesh position={[0, -dropHeight / 2, 0]}>
+          <cylinderGeometry args={[0.03, 0.03, dropHeight - 0.3, 8]} />
+          <meshStandardMaterial color="#C0A060" roughness={0.3} metalness={0.7} />
+        </mesh>
+
+        {/* Central hub */}
+        <mesh position={[0, -dropHeight + 0.1, 0]}>
+          <sphereGeometry args={[0.2, 16, 16]} />
+          <meshStandardMaterial color="#C0A060" roughness={0.3} metalness={0.7} />
+        </mesh>
+
+        {/* Arms with candle-style lights */}
+        {Array.from({ length: armCount }).map((_, i) => {
+          const angle = (i / armCount) * Math.PI * 2;
+          const x = Math.cos(angle) * armLength;
+          const z = Math.sin(angle) * armLength;
+          return (
+            <group key={i}>
+              {/* Arm */}
+              <mesh position={[x / 2, -dropHeight + 0.1, z / 2]} rotation={[0, -angle, Math.PI / 2]}>
+                <cylinderGeometry args={[0.02, 0.02, armLength, 8]} />
+                <meshStandardMaterial color="#C0A060" roughness={0.3} metalness={0.7} />
+              </mesh>
+              {/* Candle holder */}
+              <mesh position={[x, -dropHeight + 0.05, z]}>
+                <cylinderGeometry args={[0.06, 0.08, 0.1, 12]} />
+                <meshStandardMaterial color="#C0A060" roughness={0.3} metalness={0.7} />
+              </mesh>
+              {/* Candle bulb */}
+              <mesh position={[x, -dropHeight + 0.2, z]}>
+                <cylinderGeometry args={[0.03, 0.05, 0.2, 8]} />
+                <meshStandardMaterial
+                  color="#fff8e8"
+                  emissive={item.isOn ? item.lightColor : "#000000"}
+                  emissiveIntensity={item.isOn ? 0.6 : 0}
+                  roughness={0.5}
+                />
+              </mesh>
+              {/* Flame tip */}
+              {item.isOn && (
+                <mesh position={[x, -dropHeight + 0.35, z]}>
+                  <coneGeometry args={[0.03, 0.08, 8]} />
+                  <meshBasicMaterial color={item.lightColor} transparent opacity={0.7} />
+                </mesh>
+              )}
+            </group>
+          );
+        })}
+
+        {/* Point light */}
+        {item.isOn && (
+          <pointLight
+            position={[0, -dropHeight, 0]}
+            intensity={0.5 + item.lightIntensity * 3}
+            color={item.lightColor}
+            castShadow
+            distance={35}
+            decay={1.2}
+            shadow-mapSize={[1024, 1024]}
+            shadow-bias={-0.002}
+            shadow-radius={4}
+          />
+        )}
+      </group>
+    );
+  }
+
+  // Default - flush mount dome
   return (
     <group
       position={[item.x, WALL_HEIGHT - fixtureHeight / 2, item.y]}
@@ -373,14 +1146,155 @@ function CeilingLightModel({ item, isSelected, onSelect }: { item: CeilingItem; 
   );
 }
 
-// Ceiling fan (no light)
+// Ceiling fan
 function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; isSelected?: boolean; onSelect?: () => void }) {
   const hubRadius = 0.3;
   const bladeLength = item.size / 2 - hubRadius;
   const bladeWidth = 0.4;
   const dropHeight = 0.8;
   const fanRadius = item.size / 2;
+  const variant = item.variant || "default";
 
+  // Fan with integrated light
+  if (variant === "withLight") {
+    return (
+      <group
+        position={[item.x, WALL_HEIGHT - dropHeight, item.y]}
+        onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
+      >
+        {/* Selection ring */}
+        {isSelected && (
+          <mesh position={[0, -dropHeight / 2 - 0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[fanRadius + 0.1, fanRadius + 0.2, 32]} />
+            <meshBasicMaterial color="#fbbf24" side={2} />
+          </mesh>
+        )}
+
+        {/* Mounting rod */}
+        <mesh castShadow>
+          <cylinderGeometry args={[0.05, 0.05, dropHeight, 8]} />
+          <meshStandardMaterial color="#555555" roughness={0.4} metalness={0.6} />
+        </mesh>
+
+        {/* Motor housing */}
+        <mesh position={[0, -dropHeight / 2, 0]} castShadow>
+          <cylinderGeometry args={[hubRadius, hubRadius * 0.8, 0.4, 32]} />
+          <meshStandardMaterial color="#333333" roughness={0.3} metalness={0.7} />
+        </mesh>
+
+        {/* Fan blades (5 blades) */}
+        {[0, 72, 144, 216, 288].map((angle, i) => (
+          <mesh
+            key={i}
+            position={[
+              Math.cos((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
+              -dropHeight / 2 - 0.1,
+              Math.sin((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
+            ]}
+            rotation={[0, (-angle * Math.PI) / 180, 0]}
+            castShadow
+          >
+            <boxGeometry args={[bladeLength, 0.05, bladeWidth]} />
+            <meshStandardMaterial color="#8B4513" roughness={0.7} />
+          </mesh>
+        ))}
+
+        {/* Light fixture below fan */}
+        <mesh position={[0, -dropHeight / 2 - 0.35, 0]} castShadow>
+          <cylinderGeometry args={[0.3, 0.4, 0.25, 32]} />
+          <meshStandardMaterial
+            color="#ffffff"
+            emissive={item.isOn ? item.lightColor : "#000000"}
+            emissiveIntensity={item.isOn ? 0.4 : 0}
+            roughness={0.3}
+            transparent
+            opacity={0.9}
+          />
+        </mesh>
+
+        {/* Light when on */}
+        {item.isOn && (
+          <>
+            <mesh position={[0, -dropHeight / 2 - 0.35, 0]}>
+              <sphereGeometry args={[0.2, 16, 16]} />
+              <meshBasicMaterial color={item.lightColor} transparent opacity={0.5} />
+            </mesh>
+            <pointLight
+              position={[0, -dropHeight / 2 - 0.5, 0]}
+              intensity={0.5 + item.lightIntensity * 2}
+              color={item.lightColor}
+              castShadow
+              distance={25}
+              decay={1.2}
+              shadow-mapSize={[1024, 1024]}
+              shadow-bias={-0.002}
+            />
+          </>
+        )}
+      </group>
+    );
+  }
+
+  // Industrial - larger blades, more robust design
+  if (variant === "industrial") {
+    const industrialBladeCount = 3;
+    const industrialBladeLength = bladeLength * 1.3;
+    const industrialBladeWidth = bladeWidth * 1.5;
+    return (
+      <group
+        position={[item.x, WALL_HEIGHT - dropHeight * 1.2, item.y]}
+        onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
+      >
+        {/* Selection ring */}
+        {isSelected && (
+          <mesh position={[0, -dropHeight / 2 - 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[fanRadius * 1.2 + 0.1, fanRadius * 1.2 + 0.2, 32]} />
+            <meshBasicMaterial color="#fbbf24" side={2} />
+          </mesh>
+        )}
+
+        {/* Thicker mounting rod */}
+        <mesh castShadow>
+          <cylinderGeometry args={[0.08, 0.08, dropHeight * 1.2, 8]} />
+          <meshStandardMaterial color="#2a2a2a" roughness={0.5} metalness={0.8} />
+        </mesh>
+
+        {/* Larger motor housing */}
+        <mesh position={[0, -dropHeight * 0.6, 0]} castShadow>
+          <cylinderGeometry args={[hubRadius * 1.3, hubRadius * 1.1, 0.5, 32]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.8} />
+        </mesh>
+
+        {/* Industrial blades (3 larger blades) */}
+        {Array.from({ length: industrialBladeCount }).map((_, i) => {
+          const angle = (i / industrialBladeCount) * 360;
+          return (
+            <mesh
+              key={i}
+              position={[
+                Math.cos((angle * Math.PI) / 180) * (hubRadius * 1.3 + industrialBladeLength / 2),
+                -dropHeight * 0.6 - 0.15,
+                Math.sin((angle * Math.PI) / 180) * (hubRadius * 1.3 + industrialBladeLength / 2),
+              ]}
+              rotation={[0, (-angle * Math.PI) / 180, 0]}
+              castShadow
+            >
+              <boxGeometry args={[industrialBladeLength, 0.08, industrialBladeWidth]} />
+              <meshStandardMaterial color="#444" roughness={0.5} metalness={0.6} />
+            </mesh>
+          );
+        })}
+
+        {/* Industrial bottom cap */}
+        <mesh position={[0, -dropHeight * 0.6 - 0.3, 0]} castShadow>
+          <cylinderGeometry args={[0.1, 0.15, 0.15, 16]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.8} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Default - standard fan without light
   return (
     <group
       position={[item.x, WALL_HEIGHT - dropHeight, item.y]}
@@ -456,23 +1370,24 @@ function FurnitureItem3D({
 
   // Render furniture with original dimensions - rotation is applied to the group
   const renderFurniture = () => {
+    const variant = item.variant || "default";
     switch (item.type) {
       case "bed":
-        return <BedModel w={item.w} d={item.d} color={color} />;
+        return <BedModel w={item.w} d={item.d} color={color} variant={variant} />;
       case "sofa":
-        return <SofaModel w={item.w} d={item.d} color={color} />;
+        return <SofaModel w={item.w} d={item.d} color={color} variant={variant} />;
       case "chair":
-        return <ChairModel w={item.w} d={item.d} color={color} />;
+        return <ChairModel w={item.w} d={item.d} color={color} variant={variant} />;
       case "table":
-        return <TableModel w={item.w} d={item.d} color={color} />;
+        return <TableModel w={item.w} d={item.d} color={color} variant={variant} />;
       case "desk":
-        return <DeskModel w={item.w} d={item.d} color={color} />;
+        return <DeskModel w={item.w} d={item.d} color={color} variant={variant} />;
       case "dresser":
-        return <DresserModel w={item.w} d={item.d} color={color} />;
+        return <DresserModel w={item.w} d={item.d} color={color} variant={variant} />;
       case "tvStand":
-        return <TVStandModel w={item.w} d={item.d} color={color} />;
+        return <TVStandModel w={item.w} d={item.d} color={color} variant={variant} />;
       case "rug":
-        return <RugModel w={item.w} d={item.d} color={color} />;
+        return <RugModel w={item.w} d={item.d} color={color} variant={variant} />;
       default:
         return (
           <RoundedBox args={[item.w, 2, item.d]} radius={0.1} position={[0, 1, 0]} castShadow receiveShadow>
