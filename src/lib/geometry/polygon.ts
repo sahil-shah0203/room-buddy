@@ -174,14 +174,21 @@ export function rectangleIntersectsPolygonEdge(
  * For concave shapes, we need to check:
  * 1. All 4 corners are inside the polygon
  * 2. No item edge intersects any wall edge
+ *
+ * Accounts for item rotation when calculating bounds.
  */
 export function isItemInsideShape(item: Item, shape: RoomShape): boolean {
-  // Get the 4 corners of the item
+  // Calculate bounds based on rotation (90/270 swaps width and depth)
+  const isRotated = item.rotation === 90 || item.rotation === 270;
+  const boundsWidth = isRotated ? item.d : item.w;
+  const boundsDepth = isRotated ? item.w : item.d;
+
+  // Get the 4 corners of the item's bounding box
   const corners: Point[] = [
     { x: item.x, y: item.y },
-    { x: item.x + item.w, y: item.y },
-    { x: item.x + item.w, y: item.y + item.d },
-    { x: item.x, y: item.y + item.d },
+    { x: item.x + boundsWidth, y: item.y },
+    { x: item.x + boundsWidth, y: item.y + boundsDepth },
+    { x: item.x, y: item.y + boundsDepth },
   ];
 
   // All corners must be inside
@@ -193,7 +200,9 @@ export function isItemInsideShape(item: Item, shape: RoomShape): boolean {
 
   // For polygons, also check that no item edge crosses a wall edge
   if (shape.type === "polygon") {
-    if (rectangleIntersectsPolygonEdge(item, shape.vertices)) {
+    // Create a temporary item with rotated bounds for edge intersection check
+    const boundsItem = { ...item, w: boundsWidth, d: boundsDepth };
+    if (rectangleIntersectsPolygonEdge(boundsItem, shape.vertices)) {
       return false;
     }
   }

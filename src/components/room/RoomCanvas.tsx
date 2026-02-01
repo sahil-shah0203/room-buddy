@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
 import type { Item, Vertex, FurnitureType, WallOpening, CeilingItem } from "@/types/room";
 import { getBoundingBox, shapeToSvgPath } from "@/lib/geometry/polygon";
+import { getItemBounds } from "@/lib/geometry/collision";
 
 // Furniture styling configuration
 const FURNITURE_STYLES: Record<FurnitureType, { fill: string; stroke: string; icon: string }> = {
@@ -21,7 +22,7 @@ type DragState =
   | { type: "none" }
   | { type: "drag"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } }
   | { type: "vertex"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } }
-  | { type: "resize"; id: string; handle: string; startPx: { x: number; y: number }; startItem: { x: number; y: number; w: number; d: number } }
+  | { type: "resize"; id: string; handle: string; startPx: { x: number; y: number }; startItem: { x: number; y: number; w: number; d: number; rotation: number } }
   | { type: "opening"; id: string; mode: "move" | "resize-left" | "resize-right"; wallIndex: number; startPx: { x: number; y: number }; startPos: number; startWidth: number }
   | { type: "ceiling"; id: string; startPx: { x: number; y: number }; startRoom: { x: number; y: number } };
 
@@ -125,7 +126,7 @@ export default function RoomCanvas() {
       id: item.id,
       handle,
       startPx: px,
-      startItem: { x: item.x, y: item.y, w: item.w, d: item.d },
+      startItem: { x: item.x, y: item.y, w: item.w, d: item.d, rotation: item.rotation },
     });
   }
 
@@ -198,22 +199,47 @@ export default function RoomCanvas() {
       let newX = drag.startItem.x;
       let newY = drag.startItem.y;
 
-      // Handle different resize handles
+      // When rotated 90° or 270°, the visual axes are swapped:
+      // - Visual width (e/w handles) corresponds to item.d
+      // - Visual depth (n/s handles) corresponds to item.w
+      const isRotated = drag.startItem.rotation === 90 || drag.startItem.rotation === 270;
+
+      // Handle different resize handles, accounting for rotation
       if (drag.handle.includes("e")) {
-        newW = Math.max(0.5, drag.startItem.w + dxRoom);
+        if (isRotated) {
+          newD = Math.max(0.5, drag.startItem.d + dxRoom);
+        } else {
+          newW = Math.max(0.5, drag.startItem.w + dxRoom);
+        }
       }
       if (drag.handle.includes("w")) {
-        const deltaW = Math.min(dxRoom, drag.startItem.w - 0.5);
-        newW = drag.startItem.w - deltaW;
-        newX = drag.startItem.x + deltaW;
+        if (isRotated) {
+          const delta = Math.min(dxRoom, drag.startItem.d - 0.5);
+          newD = drag.startItem.d - delta;
+          newX = drag.startItem.x + delta;
+        } else {
+          const delta = Math.min(dxRoom, drag.startItem.w - 0.5);
+          newW = drag.startItem.w - delta;
+          newX = drag.startItem.x + delta;
+        }
       }
       if (drag.handle.includes("s")) {
-        newD = Math.max(0.5, drag.startItem.d + dyRoom);
+        if (isRotated) {
+          newW = Math.max(0.5, drag.startItem.w + dyRoom);
+        } else {
+          newD = Math.max(0.5, drag.startItem.d + dyRoom);
+        }
       }
       if (drag.handle.includes("n")) {
-        const deltaD = Math.min(dyRoom, drag.startItem.d - 0.5);
-        newD = drag.startItem.d - deltaD;
-        newY = drag.startItem.y + deltaD;
+        if (isRotated) {
+          const delta = Math.min(dyRoom, drag.startItem.w - 0.5);
+          newW = drag.startItem.w - delta;
+          newY = drag.startItem.y + delta;
+        } else {
+          const delta = Math.min(dyRoom, drag.startItem.d - 0.5);
+          newD = drag.startItem.d - delta;
+          newY = drag.startItem.y + delta;
+        }
       }
 
       // Snap to grid
@@ -519,12 +545,23 @@ export default function RoomCanvas() {
     );
   }
 
-  // Render furniture item with distinctive styling
+  // Render furniture item with distinctive styling and rotation
   function renderFurnitureItem(item: Item) {
-    const isSel = item.id === selectedItemId && editMode === "furniture";
+    const isSelected = item.id === selectedItemId && editMode === "furniture";
     const style = FURNITURE_STYLES[item.type];
-    const w = roomToPx(item.w);
-    const h = roomToPx(item.d);
+
+    // Original dimensions (before rotation) in pixels
+    const originalWidth = roomToPx(item.w);
+    const originalDepth = roomToPx(item.d);
+
+    // Bounding box dimensions (accounts for rotation) in pixels
+    const bounds = getItemBounds(item);
+    const boundsWidth = roomToPx(bounds.width);
+    const boundsDepth = roomToPx(bounds.depth);
+
+    // Center of the bounding box (used for rotation pivot)
+    const centerX = boundsWidth / 2;
+    const centerY = boundsDepth / 2;
 
     return (
       <g
@@ -533,54 +570,63 @@ export default function RoomCanvas() {
         onPointerDown={(e) => onPointerDownItem(e, item)}
         style={{ cursor: editMode === "furniture" ? "grab" : "default" }}
       >
-        {/* Main shape with color */}
-        <rect
-          width={w}
-          height={h}
-          rx={6}
-          ry={6}
-          fill={style.fill}
-          stroke={isSel ? "#000" : style.stroke}
-          strokeWidth={isSel ? 3 : 2}
-        />
+        {/* Rotated content group - rotates around bounding box center */}
+        <g transform={`translate(${centerX},${centerY}) rotate(${item.rotation}) translate(${-originalWidth / 2},${-originalDepth / 2})`}>
+          {/* Main shape */}
+          <rect
+            width={originalWidth}
+            height={originalDepth}
+            rx={6}
+            ry={6}
+            fill={style.fill}
+            stroke={isSelected ? "#000" : style.stroke}
+            strokeWidth={isSelected ? 3 : 2}
+          />
 
-        {/* Label */}
-        <text
-          x={w / 2}
-          y={h / 2 - 4}
-          fontSize={12}
-          fontWeight={500}
-          fill="white"
-          textAnchor="middle"
-          style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
-        >
-          {item.label ?? item.type}
-        </text>
-        <text
-          x={w / 2}
-          y={h / 2 + 10}
-          fontSize={10}
-          fill="rgba(255,255,255,0.8)"
-          textAnchor="middle"
-        >
-          {item.w}×{item.d}
-        </text>
+          {/* Direction indicator (triangle pointing "forward" / bottom of item) */}
+          <polygon
+            points={`${originalWidth / 2 - 6},${originalDepth - 4} ${originalWidth / 2 + 6},${originalDepth - 4} ${originalWidth / 2},${originalDepth - 12}`}
+            fill="rgba(255,255,255,0.6)"
+          />
 
-        {/* Selection UI - resize handles and rotate button */}
-        {isSel && (
+          {/* Label */}
+          <text
+            x={originalWidth / 2}
+            y={originalDepth / 2 - 4}
+            fontSize={12}
+            fontWeight={500}
+            fill="white"
+            textAnchor="middle"
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}
+          >
+            {item.label ?? item.type}
+          </text>
+          <text
+            x={originalWidth / 2}
+            y={originalDepth / 2 + 10}
+            fontSize={10}
+            fill="rgba(255,255,255,0.8)"
+            textAnchor="middle"
+          >
+            {item.w}×{item.d}
+          </text>
+        </g>
+
+        {/* Selection UI - resize handles stay axis-aligned on bounding box */}
+        {isSelected && (
           <>
             {/* Corner resize handles */}
             {["nw", "ne", "sw", "se"].map((handle) => {
               const isLeft = handle.includes("w");
               const isTop = handle.includes("n");
-              const cx = isLeft ? 0 : w;
-              const cy = isTop ? 0 : h;
+              const handleX = isLeft ? 0 : boundsWidth;
+              const handleY = isTop ? 0 : boundsDepth;
               const cursor = handle === "nw" || handle === "se" ? "nwse-resize" : "nesw-resize";
               return (
                 <rect
                   key={handle}
-                  x={cx - 5}
-                  y={cy - 5}
+                  x={handleX - 5}
+                  y={handleY - 5}
                   width={10}
                   height={10}
                   rx={2}
@@ -595,17 +641,18 @@ export default function RoomCanvas() {
 
             {/* Edge resize handles */}
             {["n", "s", "e", "w"].map((handle) => {
-              let cx = w / 2, cy = h / 2;
+              let handleX = boundsWidth / 2;
+              let handleY = boundsDepth / 2;
               let cursor = "ns-resize";
-              if (handle === "n") { cy = 0; }
-              if (handle === "s") { cy = h; }
-              if (handle === "e") { cx = w; cursor = "ew-resize"; }
-              if (handle === "w") { cx = 0; cursor = "ew-resize"; }
+              if (handle === "n") { handleY = 0; }
+              if (handle === "s") { handleY = boundsDepth; }
+              if (handle === "e") { handleX = boundsWidth; cursor = "ew-resize"; }
+              if (handle === "w") { handleX = 0; cursor = "ew-resize"; }
               return (
                 <rect
                   key={handle}
-                  x={cx - 4}
-                  y={cy - 4}
+                  x={handleX - 4}
+                  y={handleY - 4}
                   width={8}
                   height={8}
                   rx={1}
@@ -617,7 +664,6 @@ export default function RoomCanvas() {
                 />
               );
             })}
-
           </>
         )}
       </g>

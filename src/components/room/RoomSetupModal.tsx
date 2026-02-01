@@ -1,153 +1,29 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useRoomStore, type RoomTemplate } from "@/store/roomStore";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useRoomStore, type RoomDesignExport } from "@/store/roomStore";
 import { getRoomDimensions } from "@/lib/geometry/collision";
 import { getBoundingBox, shapeToSvgPath } from "@/lib/geometry/polygon";
 import type { FloorType, Vertex, WallOpening } from "@/types/room";
 import { nanoid } from "nanoid";
 
-// Room templates
-// Rules: No furniture overlaps except rug (which can be under other furniture)
-// All labels use standard component names (no custom labels)
-const ROOM_TEMPLATES: RoomTemplate[] = [
-  {
-    id: "bedroom",
-    name: "Bedroom",
-    shape: {
-      type: "polygon",
-      vertices: [
-        { id: "v1", x: 0, y: 0 },
-        { id: "v2", x: 14, y: 0 },
-        { id: "v3", x: 14, y: 12 },
-        { id: "v4", x: 0, y: 12 },
-      ],
-    },
-    items: [
-      { type: "rug", label: "Rug", x: 3, y: 5, w: 8, d: 5, rotation: 0 },
-      { type: "bed", label: "Bed", x: 4.5, y: 0.5, w: 5, d: 6.5, rotation: 0 },
-      { type: "table", label: "Table", x: 2, y: 0.5, w: 2, d: 2, rotation: 0 },
-      // Dresser flush with right and bottom walls, drawers facing left (toward bed) - rotation 90
-      { type: "dresser", label: "Dresser", x: 12, y: 8, w: 2, d: 4, rotation: 90 },
-    ],
-    ceilingItems: [
-      { type: "ceilingLight", label: "Ceiling Light", x: 7, y: 6, size: 1.5, lightColor: "#fff5e6", lightIntensity: 0.8, isOn: true },
-    ],
-    openings: [
-      { type: "door", wallIndex: 3, position: 0.2, width: 3, height: 7, fromFloor: 0, swingDirection: "left" },
-      { type: "window", wallIndex: 1, position: 0.5, width: 4, height: 4, fromFloor: 3 },
-    ],
-    appearance: { floorType: "wood", floorColor: "#c4a77d" },
-  },
-  {
-    id: "living-room",
-    name: "Living Room",
-    shape: {
-      type: "polygon",
-      vertices: [
-        { id: "v1", x: 0, y: 0 },
-        { id: "v2", x: 10, y: 0 },
-        { id: "v3", x: 10, y: 6 },
-        { id: "v4", x: 18, y: 6 },
-        { id: "v5", x: 18, y: 14 },
-        { id: "v6", x: 0, y: 14 },
-      ],
-    },
-    items: [
-      { type: "rug", label: "Rug", x: 1, y: 4, w: 8, d: 6, rotation: 0 },
-      { type: "tvStand", label: "TV Stand", x: 2.5, y: 0.5, w: 5, d: 1.5, rotation: 0 },
-      // Sofa facing TV (rotation 180)
-      { type: "sofa", label: "Sofa", x: 1.5, y: 7, w: 7, d: 3, rotation: 180 },
-      { type: "table", label: "Table", x: 3, y: 4, w: 4, d: 2, rotation: 0 },
-      // Desk and chair moved left to make room for door
-      { type: "desk", label: "Desk", x: 10.5, y: 6.5, w: 4, d: 2, rotation: 0 },
-      { type: "chair", label: "Chair", x: 11.5, y: 9, w: 2, d: 2, rotation: 0 },
-    ],
-    ceilingItems: [
-      { type: "ceilingLight", label: "Ceiling Light", x: 5, y: 7, size: 2, lightColor: "#ffffff", lightIntensity: 0.9, isOn: true },
-      { type: "ceilingFan", label: "Ceiling Fan", x: 14, y: 10, size: 4, lightColor: "#ffffff", lightIntensity: 0, isOn: false },
-    ],
-    openings: [
-      { type: "door", wallIndex: 3, position: 0.7, width: 3, height: 7, fromFloor: 0, swingDirection: "right" },
-      { type: "window", wallIndex: 5, position: 0.5, width: 6, height: 4, fromFloor: 3 },
-    ],
-    appearance: { floorType: "wood", floorColor: "#b89470" },
-  },
-  {
-    id: "home-office",
-    name: "Home Office",
-    shape: {
-      type: "polygon",
-      vertices: [
-        { id: "v1", x: 0, y: 0 },
-        { id: "v2", x: 12, y: 0 },
-        { id: "v3", x: 12, y: 10 },
-        { id: "v4", x: 0, y: 10 },
-      ],
-    },
-    items: [
-      { type: "rug", label: "Rug", x: 1, y: 4, w: 6, d: 5, rotation: 0 },
-      { type: "desk", label: "Desk", x: 0.5, y: 0.5, w: 5, d: 2.5, rotation: 0 },
-      // Chair centered with desk, rotated 180 to face the desk
-      { type: "chair", label: "Chair", x: 2, y: 3.5, w: 2, d: 2, rotation: 180 },
-      { type: "dresser", label: "Dresser", x: 9, y: 0.5, w: 2.5, d: 2, rotation: 0 },
-      { type: "table", label: "Table", x: 9, y: 7, w: 2.5, d: 2.5, rotation: 0 },
-    ],
-    ceilingItems: [
-      { type: "ceilingLight", label: "Ceiling Light", x: 6, y: 5, size: 1.5, lightColor: "#f5f5f5", lightIntensity: 1, isOn: true },
-    ],
-    openings: [
-      { type: "door", wallIndex: 2, position: 0.8, width: 3, height: 7, fromFloor: 0, swingDirection: "left" },
-      { type: "window", wallIndex: 0, position: 0.35, width: 4, height: 4, fromFloor: 3 },
-    ],
-    appearance: { floorType: "carpet", floorColor: "#8b9dc3" },
-  },
-  {
-    id: "studio",
-    name: "Studio Apartment",
-    shape: {
-      type: "polygon",
-      vertices: [
-        // U-shape: top-left room, top-right room, connected at bottom
-        { id: "v1", x: 0, y: 0 },
-        { id: "v2", x: 6, y: 0 },
-        { id: "v3", x: 6, y: 5 },
-        { id: "v4", x: 14, y: 5 },
-        { id: "v5", x: 14, y: 0 },
-        { id: "v6", x: 20, y: 0 },
-        { id: "v7", x: 20, y: 16 },
-        { id: "v8", x: 0, y: 16 },
-      ],
-    },
-    items: [
-      // Rug in living area only
-      { type: "rug", label: "Rug", x: 1, y: 7, w: 7, d: 6, rotation: 0 },
-      // Bedroom area (top right)
-      { type: "bed", label: "Bed", x: 14.5, y: 0.5, w: 5, d: 6.5, rotation: 0 },
-      // Dresser flush against top wall (y=5 is the internal wall)
-      { type: "dresser", label: "Dresser", x: 8, y: 5, w: 4, d: 2, rotation: 0 },
-      // Top left room: dining area - chairs rotated 180 to face table, positioned above table
-      { type: "table", label: "Table", x: 1, y: 1.5, w: 4, d: 2.5, rotation: 0 },
-      { type: "chair", label: "Chair", x: 1.5, y: 0, w: 2, d: 1.5, rotation: 180 },
-      { type: "chair", label: "Chair", x: 3.5, y: 0, w: 2, d: 1.5, rotation: 180 },
-      // Living area: sofa facing TV (bottom wall), TV flush against bottom wall
-      { type: "tvStand", label: "TV Stand", x: 2, y: 14.5, w: 5, d: 1.5, rotation: 0 },
-      { type: "sofa", label: "Sofa", x: 1.5, y: 10, w: 6, d: 3, rotation: 0 },
-    ],
-    ceilingItems: [
-      { type: "ceilingLight", label: "Ceiling Light", x: 4, y: 11, size: 2, lightColor: "#fff8e7", lightIntensity: 0.8, isOn: true },
-      { type: "ceilingLight", label: "Ceiling Light", x: 17, y: 4, size: 1.5, lightColor: "#fff5e6", lightIntensity: 0.7, isOn: true },
-      { type: "ceilingLight", label: "Ceiling Light", x: 3, y: 2.5, size: 1.2, lightColor: "#ffffff", lightIntensity: 0.7, isOn: true },
-    ],
-    openings: [
-      // Door bottom right
-      { type: "door", wallIndex: 6, position: 0.15, width: 3, height: 7, fromFloor: 0, swingDirection: "right" },
-      { type: "window", wallIndex: 0, position: 0.5, width: 3, height: 4, fromFloor: 3 },
-      { type: "window", wallIndex: 5, position: 0.5, width: 5, height: 4, fromFloor: 3 },
-    ],
-    appearance: { floorType: "wood", floorColor: "#d4b896" },
-  },
-];
+// Template metadata from index.json
+type TemplateInfo = {
+  id: string;
+  name: string;
+  file: string;
+};
+
+// Cached template data (fetched on demand)
+type LoadedTemplate = TemplateInfo & {
+  data?: RoomDesignExport;
+  loading?: boolean;
+  error?: string;
+};
+
+// Removed hardcoded ROOM_TEMPLATES - now loaded from /public/templates/*.json
+// To add/edit templates, modify the JSON files in /public/templates/
+// Template index is at /public/templates/index.json
 
 interface RoomSetupModalProps {
   onClose: () => void;
@@ -181,13 +57,116 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     selectedOpeningId,
     selectOpening,
     setEditMode,
-    applyTemplate,
+    importDesign,
   } = useRoomStore();
 
   const [activeTab, setActiveTab] = useState<"templates" | "shape" | "openings" | "appearance">("templates");
   const [selectedWall, setSelectedWall] = useState(0);
   const [drag, setDrag] = useState<DragState>({ type: "none" });
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState(false);
+
+  // Dynamic template loading from JSON files
+  const [templates, setTemplates] = useState<LoadedTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+
+  // Fetch template index and preload all template data on mount
+  useEffect(() => {
+    async function loadTemplates() {
+      try {
+        // First fetch the index
+        const indexResponse = await fetch("/templates/index.json");
+        if (!indexResponse.ok) throw new Error("Failed to load template index");
+        const indexData = await indexResponse.json();
+        const templateInfos: TemplateInfo[] = indexData.templates;
+
+        // Then fetch all template files in parallel for previews
+        const loadedTemplates = await Promise.all(
+          templateInfos.map(async (info): Promise<LoadedTemplate> => {
+            try {
+              const response = await fetch(`/templates/${info.file}`);
+              if (!response.ok) throw new Error("Failed to load");
+              const data: RoomDesignExport = await response.json();
+              return { ...info, data };
+            } catch {
+              return { ...info, error: "Failed to load" };
+            }
+          })
+        );
+
+        setTemplates(loadedTemplates);
+      } catch (error) {
+        console.error("Failed to load templates:", error);
+      } finally {
+        setTemplatesLoading(false);
+      }
+    }
+    loadTemplates();
+  }, []);
+
+  // Load and apply a template
+  const loadTemplate = useCallback(async (template: LoadedTemplate) => {
+    // If already loaded, apply immediately
+    if (template.data) {
+      importDesign(template.data);
+      return;
+    }
+
+    // Fetch the template file
+    setTemplates(prev => prev.map(t =>
+      t.id === template.id ? { ...t, loading: true, error: undefined } : t
+    ));
+
+    try {
+      const response = await fetch(`/templates/${template.file}`);
+      if (!response.ok) throw new Error("Failed to load template");
+      const data: RoomDesignExport = await response.json();
+
+      // Cache the data and apply
+      setTemplates(prev => prev.map(t =>
+        t.id === template.id ? { ...t, data, loading: false } : t
+      ));
+      importDesign(data);
+    } catch (error) {
+      setTemplates(prev => prev.map(t =>
+        t.id === template.id ? { ...t, loading: false, error: "Failed to load" } : t
+      ));
+    }
+  }, [importDesign]);
+
+  // Handle file import
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportError(null);
+    setImportSuccess(false);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string) as RoomDesignExport;
+        const result = importDesign(json);
+        if (result.ok) {
+          setImportSuccess(true);
+          setTimeout(() => setImportSuccess(false), 3000);
+        } else {
+          setImportError(result.reason);
+        }
+      } catch {
+        setImportError("Invalid JSON file");
+      }
+    };
+    reader.onerror = () => {
+      setImportError("Failed to read file");
+    };
+    reader.readAsText(file);
+
+    // Reset file input so same file can be selected again
+    e.target.value = "";
+  };
 
   const dims = getRoomDimensions(room);
   const vertices: Vertex[] = room.shape.type === "polygon" ? room.shape.vertices : [];
@@ -710,63 +689,142 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
             <div className="flex-1 overflow-y-auto p-5">
               {activeTab === "templates" && (
                 <div className="space-y-4">
+                  {/* Import Design Section */}
+                  <div className="p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Import Design</div>
+                        <div className="text-xs text-gray-500 mt-0.5">Load a previously exported room design (.json)</div>
+                      </div>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-700 flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Import
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".json,application/json"
+                        onChange={handleFileImport}
+                        className="hidden"
+                      />
+                    </div>
+                    {importError && (
+                      <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded-lg text-sm text-red-700">
+                        {importError}
+                      </div>
+                    )}
+                    {importSuccess && (
+                      <div className="mt-2 p-2 bg-green-100 border border-green-300 rounded-lg text-sm text-green-700">
+                        Design imported successfully!
+                      </div>
+                    )}
+                  </div>
+
                   <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
-                    Choose a template to quickly set up your room with furniture, lighting, and openings.
+                    Or choose a template to quickly set up your room with furniture, lighting, and openings.
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {ROOM_TEMPLATES.map((template) => {
-                      // Generate mini SVG preview
-                      const templateBbox = getBoundingBox(template.shape);
-                      const previewSize = 120;
-                      const previewScale = (previewSize - 20) / Math.max(templateBbox.width, templateBbox.depth);
-                      const previewPath = shapeToSvgPath(template.shape, previewScale);
 
-                      return (
-                        <button
-                          key={template.id}
-                          onClick={() => applyTemplate(template)}
-                          className="flex flex-col items-center p-3 border-2 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-all group"
-                        >
-                          <div className="bg-gray-100 rounded-lg p-2 mb-2 group-hover:bg-white transition-colors">
-                            <svg width={previewSize} height={previewSize} className="block">
-                              <g transform="translate(10,10)">
-                                {/* Room shape */}
-                                <path d={previewPath} fill="#f1f5f9" stroke="#64748b" strokeWidth={1.5} />
+                  {templatesLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-gray-500">Loading templates...</div>
+                    </div>
+                  ) : templates.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-gray-500">No templates available</div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {templates.map((template) => {
+                        const previewSize = 120;
 
-                                {/* Furniture dots */}
-                                {template.items.map((item, i) => (
-                                  <rect
-                                    key={i}
-                                    x={(item.x + item.w / 2) * previewScale - 3}
-                                    y={(item.y + item.d / 2) * previewScale - 3}
-                                    width={6}
-                                    height={6}
-                                    rx={1}
-                                    fill={item.type === "bed" ? "#3b82f6" : item.type === "sofa" ? "#8b5cf6" : item.type === "desk" ? "#f59e0b" : "#6b7280"}
-                                  />
-                                ))}
+                        // If template data is loaded, generate preview
+                        const hasData = !!template.data;
+                        const templateData = template.data;
+                        const templateBbox = hasData ? getBoundingBox(templateData!.room.shape) : null;
+                        const previewScale = templateBbox
+                          ? (previewSize - 20) / Math.max(templateBbox.width, templateBbox.depth)
+                          : 1;
+                        const previewPath = hasData ? shapeToSvgPath(templateData!.room.shape, previewScale) : "";
 
-                                {/* Ceiling light indicators */}
-                                {template.ceilingItems.filter(c => c.type === "ceilingLight").map((item, i) => (
-                                  <circle
-                                    key={`light-${i}`}
-                                    cx={item.x * previewScale}
-                                    cy={item.y * previewScale}
-                                    r={4}
-                                    fill="#fbbf24"
-                                    stroke="#f59e0b"
-                                    strokeWidth={1}
-                                  />
-                                ))}
-                              </g>
-                            </svg>
-                          </div>
-                          <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700">{template.name}</span>
-                          <span className="text-xs text-gray-400">{template.items.length} items · {template.ceilingItems.length} lights</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        return (
+                          <button
+                            key={template.id}
+                            onClick={() => loadTemplate(template)}
+                            disabled={template.loading}
+                            className="flex flex-col items-center p-3 border-2 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-all group disabled:opacity-50"
+                          >
+                            <div className="bg-gray-100 rounded-lg p-2 mb-2 group-hover:bg-white transition-colors">
+                              <svg width={previewSize} height={previewSize} className="block">
+                                <g transform="translate(10,10)">
+                                  {hasData ? (
+                                    <>
+                                      {/* Room shape */}
+                                      <path d={previewPath} fill="#f1f5f9" stroke="#64748b" strokeWidth={1.5} />
+
+                                      {/* Furniture dots */}
+                                      {templateData!.items.map((item, i) => (
+                                        <rect
+                                          key={i}
+                                          x={(item.x + item.w / 2) * previewScale - 3}
+                                          y={(item.y + item.d / 2) * previewScale - 3}
+                                          width={6}
+                                          height={6}
+                                          rx={1}
+                                          fill={item.type === "bed" ? "#3b82f6" : item.type === "sofa" ? "#8b5cf6" : item.type === "desk" ? "#f59e0b" : "#6b7280"}
+                                        />
+                                      ))}
+
+                                      {/* Ceiling light indicators */}
+                                      {templateData!.ceilingItems.filter(c => c.type === "ceilingLight").map((item, i) => (
+                                        <circle
+                                          key={`light-${i}`}
+                                          cx={item.x * previewScale}
+                                          cy={item.y * previewScale}
+                                          r={4}
+                                          fill="#fbbf24"
+                                          stroke="#f59e0b"
+                                          strokeWidth={1}
+                                        />
+                                      ))}
+                                    </>
+                                  ) : (
+                                    /* Placeholder when data not yet loaded */
+                                    <rect
+                                      x={10}
+                                      y={10}
+                                      width={previewSize - 40}
+                                      height={previewSize - 40}
+                                      rx={4}
+                                      fill="#e5e7eb"
+                                      stroke="#9ca3af"
+                                      strokeWidth={1}
+                                      strokeDasharray="4 2"
+                                    />
+                                  )}
+                                </g>
+                              </svg>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700">
+                              {template.loading ? "Loading..." : template.name}
+                            </span>
+                            {template.error && (
+                              <span className="text-xs text-red-500">{template.error}</span>
+                            )}
+                            {hasData && (
+                              <span className="text-xs text-gray-400">
+                                {templateData!.items.length} items · {templateData!.ceilingItems.length} lights
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 

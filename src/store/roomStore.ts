@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import type { Item, RoomState, FurnitureType, RoomShape, Vertex, EditMode, WallOpening, OpeningType, RoomAppearance, FloorType, CeilingItem, CeilingItemType } from "@/types/room";
+import type { Item, RoomState, FurnitureType, RoomShape, Vertex, EditMode, WallOpening, OpeningType, RoomAppearance, FloorType, CeilingItem, CeilingItemType, Unit } from "@/types/room";
 import { clampToRoom, rectsOverlap, isValidPlacement, getRoomDimensions } from "@/lib/geometry/collision";
 import { snapPoint } from "@/lib/geometry/snap";
 import { validateActions } from "@/lib/ai/actions";
@@ -18,6 +18,21 @@ export type RoomTemplate = {
   ceilingItems: Omit<CeilingItem, "id">[];
   openings: Omit<WallOpening, "id">[];
   appearance?: Partial<RoomAppearance>;
+};
+
+// Export format for saving/loading designs
+export type RoomDesignExport = {
+  version: 1;
+  name?: string;
+  exportedAt: string;
+  room: {
+    shape: RoomShape;
+    unit: Unit;
+  };
+  items: Omit<Item, "id">[];
+  ceilingItems: Omit<CeilingItem, "id">[];
+  openings: Omit<WallOpening, "id">[];
+  appearance: RoomAppearance;
 };
 
 type Actions = {
@@ -84,6 +99,10 @@ type Actions = {
 
   // Templates
   applyTemplate: (template: RoomTemplate) => void;
+
+  // Import/Export
+  exportDesign: (name?: string) => RoomDesignExport;
+  importDesign: (design: RoomDesignExport) => { ok: true } | { ok: false; reason: string };
 };
 
 const DEFAULT_SIZES: Record<FurnitureType, { w: number; d: number; label: string }> = {
@@ -501,8 +520,8 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
     const next = s.items.map((it) => {
       if (it.id !== id) return it;
       const nextRot = (((it.rotation + 90) % 360) as 0 | 90 | 180 | 270);
-      const swapped = nextRot === 90 || nextRot === 270 ? { w: it.d, d: it.w } : { w: it.w, d: it.d };
-      return clampToRoom(s.room, { ...it, ...swapped, rotation: nextRot });
+      // Don't swap dimensions - just update rotation. Views handle visual rotation.
+      return clampToRoom(s.room, { ...it, rotation: nextRot });
     });
 
     const rotated = next.find((it) => it.id === id);
@@ -786,4 +805,77 @@ export const useRoomStore = create<RoomState & Actions>((set, get) => ({
         selectedVertexId: null,
       };
     }),
+
+  // Export current design as JSON
+  exportDesign: (name) => {
+    const s = get();
+    return {
+      version: 1 as const,
+      name,
+      exportedAt: new Date().toISOString(),
+      room: {
+        shape: s.room.shape,
+        unit: s.room.unit,
+      },
+      // Strip IDs from items for export
+      items: s.items.map(({ id, ...rest }) => rest),
+      ceilingItems: s.ceilingItems.map(({ id, ...rest }) => rest),
+      openings: s.openings.map(({ id, ...rest }) => rest),
+      appearance: s.appearance,
+    };
+  },
+
+  // Import a design from JSON
+  importDesign: (design) => {
+    // Validate version
+    if (design.version !== 1) {
+      return { ok: false, reason: "Unsupported design version" };
+    }
+
+    // Validate required fields
+    if (!design.room?.shape || !design.appearance) {
+      return { ok: false, reason: "Invalid design format: missing required fields" };
+    }
+
+    // Regenerate IDs for all items
+    const newShape: RoomShape = design.room.shape.type === "polygon"
+      ? {
+          type: "polygon",
+          vertices: design.room.shape.vertices.map((v) => ({
+            ...v,
+            id: nanoid(),
+          })),
+        }
+      : design.room.shape;
+
+    set((s) => ({
+      ...s,
+      room: {
+        shape: newShape,
+        unit: design.room.unit || "ft",
+      },
+      items: (design.items || []).map((item) => ({
+        ...item,
+        id: nanoid(),
+      })),
+      ceilingItems: (design.ceilingItems || []).map((item) => ({
+        ...item,
+        id: nanoid(),
+      })),
+      openings: (design.openings || []).map((opening) => ({
+        ...opening,
+        id: nanoid(),
+      })),
+      appearance: {
+        ...DEFAULT_APPEARANCE,
+        ...design.appearance,
+      },
+      selectedItemId: null,
+      selectedCeilingItemId: null,
+      selectedOpeningId: null,
+      selectedVertexId: null,
+    }));
+
+    return { ok: true };
+  },
 }));

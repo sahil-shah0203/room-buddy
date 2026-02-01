@@ -1,12 +1,31 @@
 import type { Item, Room, RoomShape } from "@/types/room";
 import { getBoundingBox, isItemInsideShape } from "./polygon";
 
+/**
+ * Get the bounding box dimensions for an item, accounting for rotation.
+ * When rotated 90° or 270°, the bounding box width/depth are swapped.
+ *
+ * Use this for:
+ * - Collision detection
+ * - Positioning calculations
+ * - Both 2D and 3D views should use this for consistent bounds
+ */
+export function getItemBounds(item: Item): { width: number; depth: number } {
+  const isRotated = item.rotation === 90 || item.rotation === 270;
+  return {
+    width: isRotated ? item.d : item.w,
+    depth: isRotated ? item.w : item.d,
+  };
+}
+
 export function rectsOverlap(a: Item, b: Item): boolean {
+  const boundsA = getItemBounds(a);
+  const boundsB = getItemBounds(b);
   return (
-    a.x < b.x + b.w &&
-    a.x + a.w > b.x &&
-    a.y < b.y + b.d &&
-    a.y + a.d > b.y
+    a.x < b.x + boundsB.width &&
+    a.x + boundsA.width > b.x &&
+    a.y < b.y + boundsB.depth &&
+    a.y + boundsA.depth > b.y
   );
 }
 
@@ -23,9 +42,10 @@ export function getRoomDimensions(room: Room): { width: number; depth: number } 
  * For polygons, this is just a first pass - isValidPlacement does the real check
  */
 export function clampToRoom(room: Room, item: Item): Item {
-  const bbox = getBoundingBox(room.shape);
-  const x = Math.min(Math.max(bbox.minX, item.x), Math.max(bbox.minX, bbox.maxX - item.w));
-  const y = Math.min(Math.max(bbox.minY, item.y), Math.max(bbox.minY, bbox.maxY - item.d));
+  const roomBox = getBoundingBox(room.shape);
+  const itemBounds = getItemBounds(item);
+  const x = Math.min(Math.max(roomBox.minX, item.x), Math.max(roomBox.minX, roomBox.maxX - itemBounds.width));
+  const y = Math.min(Math.max(roomBox.minY, item.y), Math.max(roomBox.minY, roomBox.maxY - itemBounds.depth));
   return { ...item, x, y };
 }
 

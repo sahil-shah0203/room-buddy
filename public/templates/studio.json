@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "Studio Apartment",
+  "room": {
+    "shape": {
+      "type": "polygon",
+      "vertices": [
+        { "id": "v1", "x": 0, "y": 0 },
+        { "id": "v2", "x": 6, "y": 0 },
+        { "id": "v3", "x": 6, "y": 5 },
+        { "id": "v4", "x": 14, "y": 5 },
+        { "id": "v5", "x": 14, "y": 0 },
+        { "id": "v6", "x": 20, "y": 0 },
+        { "id": "v7", "x": 20, "y": 16 },
+        { "id": "v8", "x": 0, "y": 16 }
+      ]
+    },
+    "unit": "ft"
+  },
+  "items": [
+    { "type": "rug", "label": "Rug", "x": 1, "y": 7, "w": 7, "d": 6, "rotation": 0 },
+    { "type": "bed", "label": "Bed", "x": 14.5, "y": 0.5, "w": 5, "d": 6.5, "rotation": 0 },
+    { "type": "dresser", "label": "Dresser", "x": 8, "y": 5, "w": 4, "d": 2, "rotation": 0 },
+    { "type": "table", "label": "Table", "x": 1, "y": 1.5, "w": 4, "d": 2.5, "rotation": 0 },
+    { "type": "chair", "label": "Chair", "x": 1.5, "y": 0, "w": 2, "d": 1.5, "rotation": 180 },
+    { "type": "chair", "label": "Chair", "x": 3.5, "y": 0, "w": 2, "d": 1.5, "rotation": 180 },
+    { "type": "tvStand", "label": "TV Stand", "x": 2, "y": 15.25, "w": 5, "d": 1.5, "rotation": 0 },
+    { "type": "sofa", "label": "Sofa", "x": 1.5, "y": 10, "w": 6, "d": 3, "rotation": 0 }
+  ],
+  "ceilingItems": [
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 4, "y": 11, "size": 2, "lightColor": "#fff8e7", "lightIntensity": 0.8, "isOn": true },
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 17, "y": 4, "size": 1.5, "lightColor": "#fff5e6", "lightIntensity": 0.7, "isOn": true },
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 3, "y": 2.5, "size": 1.2, "lightColor": "#ffffff", "lightIntensity": 0.7, "isOn": true }
+  ],
+  "openings": [
+    { "type": "door", "wallIndex": 6, "position": 0.15, "width": 3, "height": 7, "fromFloor": 0, "swingDirection": "right" },
+    { "type": "window", "wallIndex": 0, "position": 0.5, "width": 3, "height": 4, "fromFloor": 3 },
+    { "type": "window", "wallIndex": 5, "position": 0.5, "width": 5, "height": 4, "fromFloor": 3 }
+  ],
+  "appearance": {
+    "wallColor": "#f5f5f4",
+    "floorType": "wood",
+    "floorColor": "#d4b896",
+    "ceilingColor": "#ffffff"
+  }
+}

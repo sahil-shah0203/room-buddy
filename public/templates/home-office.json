@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "name": "Home Office",
+  "room": {
+    "shape": {
+      "type": "polygon",
+      "vertices": [
+        { "id": "v1", "x": 0, "y": 0 },
+        { "id": "v2", "x": 12, "y": 0 },
+        { "id": "v3", "x": 12, "y": 10 },
+        { "id": "v4", "x": 0, "y": 10 }
+      ]
+    },
+    "unit": "ft"
+  },
+  "items": [
+    { "type": "rug", "label": "Rug", "x": 1, "y": 4, "w": 6, "d": 5, "rotation": 0 },
+    { "type": "desk", "label": "Desk", "x": 0.5, "y": 0.5, "w": 5, "d": 2.5, "rotation": 0 },
+    { "type": "chair", "label": "Chair", "x": 2, "y": 3.5, "w": 2, "d": 2, "rotation": 180 },
+    { "type": "dresser", "label": "Dresser", "x": 9, "y": 0.5, "w": 2.5, "d": 2, "rotation": 0 },
+    { "type": "table", "label": "Table", "x": 9, "y": 7, "w": 2.5, "d": 2.5, "rotation": 0 }
+  ],
+  "ceilingItems": [
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 6, "y": 5, "size": 1.5, "lightColor": "#f5f5f5", "lightIntensity": 1, "isOn": true }
+  ],
+  "openings": [
+    { "type": "door", "wallIndex": 2, "position": 0.8, "width": 3, "height": 7, "fromFloor": 0, "swingDirection": "left" },
+    { "type": "window", "wallIndex": 0, "position": 0.35, "width": 4, "height": 4, "fromFloor": 3 }
+  ],
+  "appearance": {
+    "wallColor": "#f5f5f4",
+    "floorType": "carpet",
+    "floorColor": "#8b9dc3",
+    "ceilingColor": "#ffffff"
+  }
+}

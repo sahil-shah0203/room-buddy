@@ -444,10 +444,17 @@ function FurnitureItem3D({
   const groupRef = useRef<THREE.Group>(null);
   const color = item.color || FURNITURE_COLORS[item.type];
 
-  // Position at corner (our data uses corner positioning)
-  const posX = item.x + item.w / 2;
-  const posZ = item.y + item.d / 2;
+  // Calculate bounding box center for positioning (accounts for rotation)
+  const isRotated = item.rotation === 90 || item.rotation === 270;
+  const boundsWidth = isRotated ? item.d : item.w;
+  const boundsDepth = isRotated ? item.w : item.d;
+  const posX = item.x + boundsWidth / 2;
+  const posZ = item.y + boundsDepth / 2;
 
+  // Convert rotation from degrees to radians
+  const rotationRadians = (item.rotation * Math.PI) / 180;
+
+  // Render furniture with original dimensions - rotation is applied to the group
   const renderFurniture = () => {
     switch (item.type) {
       case "bed":
@@ -479,6 +486,7 @@ function FurnitureItem3D({
     <group
       ref={groupRef}
       position={[posX, 0, posZ]}
+      rotation={[0, -rotationRadians, 0]}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
@@ -558,7 +566,7 @@ function Outdoor3D({ roomCenter }: { roomCenter: [number, number] }) {
   const treePositions = useMemo(() => {
     const trees: { x: number; z: number; scale: number }[] = [];
     // Trees on all four sides at various distances
-    const distances = [15, 25, 35, 50];
+    const distances = [25, 35, 50, 65];
     const sides = [
       { dx: 0, dz: -1 },  // North
       { dx: 0, dz: 1 },   // South

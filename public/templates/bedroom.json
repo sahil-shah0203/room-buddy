@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "exportedAt": "2026-02-01T03:51:31.209Z",
+  "room": {
+    "shape": {
+      "type": "polygon",
+      "vertices": [
+        {
+          "id": "8JQ34WRBHgAs3Bf0YHGCn",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "QY5tulvn1eUNjZh50lGJ5",
+          "x": 14,
+          "y": 0
+        },
+        {
+          "id": "cXXJQev_UFHtzy7OnYw0L",
+          "x": 14,
+          "y": 12
+        },
+        {
+          "id": "FtbiijohZo-lF0-tah1Zq",
+          "x": 0,
+          "y": 12
+        }
+      ]
+    },
+    "unit": "ft"
+  },
+  "items": [
+    {
+      "type": "rug",
+      "label": "Rug",
+      "x": 3,
+      "y": 5,
+      "w": 8,
+      "d": 5,
+      "rotation": 0
+    },
+    {
+      "type": "bed",
+      "label": "Bed",
+      "x": 4.5,
+      "y": 0.5,
+      "w": 5,
+      "d": 6.5,
+      "rotation": 0
+    },
+    {
+      "type": "table",
+      "label": "Table",
+      "x": 2,
+      "y": 0.5,
+      "w": 2,
+      "d": 2,
+      "rotation": 0
+    },
+    {
+      "type": "dresser",
+      "label": "Dresser",
+      "x": 11.5,
+      "y": 7.5,
+      "w": 4,
+      "d": 2,
+      "rotation": 90
+    }
+  ],
+  "ceilingItems": [
+    {
+      "type": "ceilingLight",
+      "label": "Ceiling Light",
+      "x": 7,
+      "y": 6,
+      "size": 1.5,
+      "lightColor": "#fff5e6",
+      "lightIntensity": 0.8,
+      "isOn": true
+    }
+  ],
+  "openings": [
+    {
+      "type": "door",
+      "wallIndex": 3,
+      "position": 0.2,
+      "width": 3,
+      "height": 7,
+      "fromFloor": 0,
+      "swingDirection": "left"
+    },
+    {
+      "type": "window",
+      "wallIndex": 1,
+      "position": 0.5,
+      "width": 4,
+      "height": 4,
+      "fromFloor": 3
+    }
+  ],
+  "appearance": {
+    "wallColor": "#f5f5f4",
+    "floorType": "wood",
+    "floorColor": "#c4a77d",
+    "ceilingColor": "#ffffff"
+  }
+}

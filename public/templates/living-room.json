@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "name": "Living Room",
+  "room": {
+    "shape": {
+      "type": "polygon",
+      "vertices": [
+        { "id": "v1", "x": 0, "y": 0 },
+        { "id": "v2", "x": 10, "y": 0 },
+        { "id": "v3", "x": 10, "y": 6 },
+        { "id": "v4", "x": 18, "y": 6 },
+        { "id": "v5", "x": 18, "y": 14 },
+        { "id": "v6", "x": 0, "y": 14 }
+      ]
+    },
+    "unit": "ft"
+  },
+  "items": [
+    { "type": "rug", "label": "Rug", "x": 1, "y": 4, "w": 8, "d": 6, "rotation": 0 },
+    { "type": "tvStand", "label": "TV Stand", "x": 2.5, "y": 0.5, "w": 5, "d": 1.5, "rotation": 0 },
+    { "type": "sofa", "label": "Sofa", "x": 1.5, "y": 7, "w": 7, "d": 3, "rotation": 180 },
+    { "type": "table", "label": "Table", "x": 3, "y": 4, "w": 4, "d": 2, "rotation": 0 },
+    { "type": "desk", "label": "Desk", "x": 10.5, "y": 6.5, "w": 4, "d": 2, "rotation": 0 },
+    { "type": "chair", "label": "Chair", "x": 11.5, "y": 9, "w": 2, "d": 2, "rotation": 0 }
+  ],
+  "ceilingItems": [
+    { "type": "ceilingLight", "label": "Ceiling Light", "x": 5, "y": 7, "size": 2, "lightColor": "#ffffff", "lightIntensity": 0.9, "isOn": true },
+    { "type": "ceilingFan", "label": "Ceiling Fan", "x": 14, "y": 10, "size": 4, "lightColor": "#ffffff", "lightIntensity": 0, "isOn": false }
+  ],
+  "openings": [
+    { "type": "door", "wallIndex": 3, "position": 0.7, "width": 3, "height": 7, "fromFloor": 0, "swingDirection": "right" },
+    { "type": "window", "wallIndex": 5, "position": 0.5, "width": 6, "height": 4, "fromFloor": 3 }
+  ],
+  "appearance": {
+    "wallColor": "#f5f5f4",
+    "floorType": "wood",
+    "floorColor": "#b89470",
+    "ceilingColor": "#ffffff"
+  }
+}

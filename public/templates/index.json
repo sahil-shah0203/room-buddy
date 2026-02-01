@@ -1,0 +1,24 @@
+{
+  "templates": [
+    {
+      "id": "bedroom",
+      "name": "Bedroom",
+      "file": "bedroom.json"
+    },
+    {
+      "id": "living-room",
+      "name": "Living Room",
+      "file": "living-room.json"
+    },
+    {
+      "id": "home-office",
+      "name": "Home Office",
+      "file": "home-office.json"
+    },
+    {
+      "id": "studio",
+      "name": "Studio Apartment",
+      "file": "studio.json"
+    }
+  ]
+}
