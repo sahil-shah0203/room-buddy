@@ -797,7 +797,7 @@ function FirstPersonControls({ speed = 0.15, disabledRef }: { speed?: number; di
 }
 
 function PolygonFloor({ vertices, floorType, floorColor }: { vertices: { x: number; y: number }[]; floorType: FloorType; floorColor: string }) {
-  // Calculate bounding box
+  // Calculate bounding box for UV mapping
   const bounds = useMemo(() => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     vertices.forEach(v => {
@@ -815,15 +815,41 @@ function PolygonFloor({ vertices, floorType, floorColor }: { vertices: { x: numb
 
   const roughness = floorType === "carpet" ? 0.95 : floorType === "tile" ? 0.5 : 0.8;
 
-  // Use a plane with proper UVs instead of ShapeGeometry
+  // Create a shape geometry that matches the room polygon
+  const geometry = useMemo(() => {
+    const shape = new THREE.Shape();
+    if (vertices.length > 0) {
+      shape.moveTo(vertices[0].x, vertices[0].y);
+      for (let i = 1; i < vertices.length; i++) {
+        shape.lineTo(vertices[i].x, vertices[i].y);
+      }
+      shape.closePath();
+    }
+    const geo = new THREE.ShapeGeometry(shape);
+
+    // Calculate UVs based on bounding box
+    const uvAttribute = geo.getAttribute('position');
+    const uvs: number[] = [];
+    for (let i = 0; i < uvAttribute.count; i++) {
+      const x = uvAttribute.getX(i);
+      const y = uvAttribute.getY(i);
+      // Map position to UV coordinates (0-1 range based on bounding box)
+      uvs.push((x - bounds.minX) / bounds.width);
+      uvs.push((y - bounds.minY) / bounds.depth);
+    }
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+    return geo;
+  }, [vertices, bounds]);
+
   return (
     <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[bounds.minX + bounds.width / 2, 0.001, bounds.minY + bounds.depth / 2]}
+      rotation={[Math.PI / 2, 0, 0]}
+      position={[0, 0.001, 0]}
       receiveShadow
+      geometry={geometry}
     >
-      <planeGeometry args={[bounds.width, bounds.depth]} />
-      <meshStandardMaterial map={floorTexture} roughness={roughness} metalness={0} />
+      <meshStandardMaterial map={floorTexture} roughness={roughness} metalness={0} side={THREE.DoubleSide} />
     </mesh>
   );
 }
