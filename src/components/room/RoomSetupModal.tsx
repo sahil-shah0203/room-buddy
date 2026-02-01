@@ -6,6 +6,7 @@ import { getRoomDimensions } from "@/lib/geometry/collision";
 import { getBoundingBox, shapeToSvgPath } from "@/lib/geometry/polygon";
 import type { FloorType, Vertex, WallOpening } from "@/types/room";
 import { nanoid } from "nanoid";
+import { decodeDesign, isEncodedDesign } from "@/lib/encoding";
 
 // Template metadata from index.json
 type TemplateInfo = {
@@ -147,10 +148,11 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     e.target.value = "";
   };
 
-  // Handle import from pasted text
-  const handlePasteImport = () => {
-    if (!importText.trim()) {
-      setImportError("Please paste JSON content");
+  // Handle import from pasted text (supports both encoded and raw JSON)
+  const handlePasteImport = async () => {
+    const text = importText.trim();
+    if (!text) {
+      setImportError("Please paste design code");
       return;
     }
 
@@ -158,7 +160,17 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     setImportSuccess(false);
 
     try {
-      const json = JSON.parse(importText) as RoomDesignExport;
+      let jsonStr: string;
+
+      // Check if it's encoded (starts with "RB1:")
+      if (isEncodedDesign(text)) {
+        jsonStr = await decodeDesign(text);
+      } else {
+        // Try as raw JSON
+        jsonStr = text;
+      }
+
+      const json = JSON.parse(jsonStr) as RoomDesignExport;
       const result = importDesign(json);
       if (result.ok) {
         setImportSuccess(true);
@@ -169,7 +181,7 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
         setImportError(result.reason);
       }
     } catch {
-      setImportError("Invalid JSON format");
+      setImportError("Invalid design code");
     }
   };
 
@@ -722,7 +734,7 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                           </svg>
-                          Paste JSON
+                          Paste Code
                         </button>
                       </div>
                       <input
@@ -740,7 +752,7 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
                         <textarea
                           value={importText}
                           onChange={(e) => setImportText(e.target.value)}
-                          placeholder="Paste your exported JSON here..."
+                          placeholder="Paste your design code here..."
                           className="w-full h-32 p-3 border rounded-lg text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                         <div className="flex justify-end gap-2">

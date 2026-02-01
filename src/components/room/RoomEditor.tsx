@@ -10,6 +10,7 @@ import SuggestionsTray from "@/components/ai/SuggestionsTray";
 import RoomSetupModal from "./RoomSetupModal";
 import { useRoomStore } from "@/store/roomStore";
 import { isTypingInInput } from "@/lib/ui/keyboard";
+import { encodeDesign } from "@/lib/encoding";
 
 // Dynamic import for 3D view to avoid SSR issues with Three.js
 const Room3DView = dynamic(() => import("./Room3DView"), {
@@ -62,12 +63,13 @@ export default function RoomEditor() {
     setShowExportMenu(false);
   }, [exportDesign]);
 
-  // Export by copying to clipboard
+  // Export by copying to clipboard (compressed)
   const handleExportCopy = useCallback(async () => {
     const design = exportDesign();
-    const json = JSON.stringify(design, null, 2);
+    const json = JSON.stringify(design);
     try {
-      await navigator.clipboard.writeText(json);
+      const encoded = await encodeDesign(json);
+      await navigator.clipboard.writeText(encoded);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (err) {
@@ -200,7 +202,7 @@ export default function RoomEditor() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    Copy to Clipboard
+                    Copy Code
                   </button>
                 </div>
               </>
