@@ -25,7 +25,7 @@
   ],
   "openings": [
     { "type": "door", "wallIndex": 2, "position": 0.8, "width": 3, "height": 7, "fromFloor": 0, "swingDirection": "left" },
-    { "type": "window", "wallIndex": 0, "position": 0.35, "width": 4, "height": 4, "fromFloor": 3 }
+    { "type": "window", "wallIndex": 0, "position": 0.5, "width": 4, "height": 4, "fromFloor": 3 }
   ],
   "appearance": {
     "wallColor": "#f5f5f4",

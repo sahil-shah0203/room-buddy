@@ -29,6 +29,8 @@ export default function RoomEditor() {
   const [editMode, setEditMode] = useState<EditMode>("furniture");
   const [toolbarExpanded, setToolbarExpanded] = useState(false);
   const [showSetupModal, setShowSetupModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // ---- Stable Zustand selectors ----
   const selectedItemId = useRoomStore((s) => s.selectedItemId);
@@ -44,8 +46,8 @@ export default function RoomEditor() {
   const setStoreEditMode = useRoomStore((s) => s.setEditMode);
   const exportDesign = useRoomStore((s) => s.exportDesign);
 
-  // Export handler
-  const handleExport = useCallback(() => {
+  // Export as file download
+  const handleExportDownload = useCallback(() => {
     const design = exportDesign();
     const json = JSON.stringify(design, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -57,6 +59,21 @@ export default function RoomEditor() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  }, [exportDesign]);
+
+  // Export by copying to clipboard
+  const handleExportCopy = useCallback(async () => {
+    const design = exportDesign();
+    const json = JSON.stringify(design, null, 2);
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+    setShowExportMenu(false);
   }, [exportDesign]);
 
   // Sync local edit mode with store
@@ -147,15 +164,48 @@ export default function RoomEditor() {
             </svg>
             Room Setup
           </button>
-          <button
-            onClick={handleExport}
-            className="px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            Export
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              {copySuccess ? "Copied!" : "Export"}
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* Export dropdown menu */}
+            {showExportMenu && (
+              <>
+                {/* Backdrop to close menu */}
+                <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border z-20 py-1 min-w-[160px]">
+                  <button
+                    onClick={handleExportDownload}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download File
+                  </button>
+                  <button
+                    onClick={handleExportCopy}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy to Clipboard
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 

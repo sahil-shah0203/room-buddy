@@ -18,14 +18,14 @@
     "unit": "ft"
   },
   "items": [
-    { "type": "rug", "label": "Rug", "x": 1, "y": 7, "w": 7, "d": 6, "rotation": 0 },
+    { "type": "rug", "label": "Rug", "x": 0.5, "y": 7, "w": 7, "d": 6, "rotation": 0 },
     { "type": "bed", "label": "Bed", "x": 14.5, "y": 0.5, "w": 5, "d": 6.5, "rotation": 0 },
     { "type": "dresser", "label": "Dresser", "x": 8, "y": 5, "w": 4, "d": 2, "rotation": 0 },
-    { "type": "table", "label": "Table", "x": 1, "y": 1.5, "w": 4, "d": 2.5, "rotation": 0 },
-    { "type": "chair", "label": "Chair", "x": 1.5, "y": 0, "w": 2, "d": 1.5, "rotation": 180 },
-    { "type": "chair", "label": "Chair", "x": 3.5, "y": 0, "w": 2, "d": 1.5, "rotation": 180 },
-    { "type": "tvStand", "label": "TV Stand", "x": 2, "y": 15.25, "w": 5, "d": 1.5, "rotation": 0 },
-    { "type": "sofa", "label": "Sofa", "x": 1.5, "y": 10, "w": 6, "d": 3, "rotation": 0 }
+    { "type": "table", "label": "Table", "x": 1, "y": 0.5, "w": 4, "d": 2.5, "rotation": 0 },
+    { "type": "chair", "label": "Chair", "x": 1, "y": 3.5, "w": 2, "d": 1.5, "rotation": 180 },
+    { "type": "chair", "label": "Chair", "x": 3, "y": 3.5, "w": 2, "d": 1.5, "rotation": 180 },
+    { "type": "tvStand", "label": "TV Stand", "x": 1.5, "y": 14, "w": 5, "d": 1.5, "rotation": 0 },
+    { "type": "sofa", "label": "Sofa", "x": 1, "y": 8, "w": 6, "d": 3, "rotation": 0 }
   ],
   "ceilingItems": [
     { "type": "ceilingLight", "label": "Ceiling Light", "x": 4, "y": 11, "size": 2, "lightColor": "#fff8e7", "lightIntensity": 0.8, "isOn": true },

@@ -67,6 +67,8 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [showPasteInput, setShowPasteInput] = useState(false);
 
   // Dynamic template loading from JSON files
   const [templates, setTemplates] = useState<LoadedTemplate[]>([]);
@@ -106,33 +108,10 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
     loadTemplates();
   }, []);
 
-  // Load and apply a template
-  const loadTemplate = useCallback(async (template: LoadedTemplate) => {
-    // If already loaded, apply immediately
+  // Apply a template (data is preloaded, so just import it)
+  const loadTemplate = useCallback((template: LoadedTemplate) => {
     if (template.data) {
       importDesign(template.data);
-      return;
-    }
-
-    // Fetch the template file
-    setTemplates(prev => prev.map(t =>
-      t.id === template.id ? { ...t, loading: true, error: undefined } : t
-    ));
-
-    try {
-      const response = await fetch(`/templates/${template.file}`);
-      if (!response.ok) throw new Error("Failed to load template");
-      const data: RoomDesignExport = await response.json();
-
-      // Cache the data and apply
-      setTemplates(prev => prev.map(t =>
-        t.id === template.id ? { ...t, data, loading: false } : t
-      ));
-      importDesign(data);
-    } catch (error) {
-      setTemplates(prev => prev.map(t =>
-        t.id === template.id ? { ...t, loading: false, error: "Failed to load" } : t
-      ));
     }
   }, [importDesign]);
 
@@ -166,6 +145,32 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
 
     // Reset file input so same file can be selected again
     e.target.value = "";
+  };
+
+  // Handle import from pasted text
+  const handlePasteImport = () => {
+    if (!importText.trim()) {
+      setImportError("Please paste JSON content");
+      return;
+    }
+
+    setImportError(null);
+    setImportSuccess(false);
+
+    try {
+      const json = JSON.parse(importText) as RoomDesignExport;
+      const result = importDesign(json);
+      if (result.ok) {
+        setImportSuccess(true);
+        setImportText("");
+        setShowPasteInput(false);
+        setTimeout(() => setImportSuccess(false), 3000);
+      } else {
+        setImportError(result.reason);
+      }
+    } catch {
+      setImportError("Invalid JSON format");
+    }
   };
 
   const dims = getRoomDimensions(room);
@@ -694,17 +699,32 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-700">Import Design</div>
-                        <div className="text-xs text-gray-500 mt-0.5">Load a previously exported room design (.json)</div>
+                        <div className="text-xs text-gray-500 mt-0.5">Load a previously exported room design</div>
                       </div>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-4 py-2 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-700 flex items-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Import
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-3 py-2 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Upload File
+                        </button>
+                        <button
+                          onClick={() => setShowPasteInput(!showPasteInput)}
+                          className={`px-3 py-2 text-sm rounded-lg flex items-center gap-2 ${
+                            showPasteInput
+                              ? "bg-purple-600 text-white"
+                              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                          Paste JSON
+                        </button>
+                      </div>
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -713,6 +733,37 @@ export default function RoomSetupModal({ onClose }: RoomSetupModalProps) {
                         className="hidden"
                       />
                     </div>
+
+                    {/* Paste input area */}
+                    {showPasteInput && (
+                      <div className="mt-3 space-y-2">
+                        <textarea
+                          value={importText}
+                          onChange={(e) => setImportText(e.target.value)}
+                          placeholder="Paste your exported JSON here..."
+                          className="w-full h-32 p-3 border rounded-lg text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setShowPasteInput(false);
+                              setImportText("");
+                              setImportError(null);
+                            }}
+                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handlePasteImport}
+                            className="px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+                          >
+                            Import
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {importError && (
                       <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded-lg text-sm text-red-700">
                         {importError}
