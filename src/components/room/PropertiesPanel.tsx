@@ -234,8 +234,9 @@ export default function PropertiesPanel({ compact = false }: PropertiesPanelProp
             />
           </div>
 
-          {/* Light controls only for ceiling lights, not fans */}
-          {selectedCeilingItem.type === "ceilingLight" && (
+          {/* Light controls for ceiling lights and fans with light variant */}
+          {(selectedCeilingItem.type === "ceilingLight" ||
+            (selectedCeilingItem.type === "ceilingFan" && selectedCeilingItem.variant === "withLight")) && (
             <>
               <div>
                 <label className="text-xs opacity-70">Light Color</label>

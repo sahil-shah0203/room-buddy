@@ -783,8 +783,10 @@ function TVStandModel({ w, d, color, variant = "default" }: { w: number; d: numb
   // Entertainment center - large with side shelves
   if (variant === "entertainment") {
     const centerHeight = 2;
-    const sideWidth = w * 0.2;
+    const sideWidth = w * 0.18;
     const centerWidth = w - sideWidth * 2;
+    const bigTvHeight = 3; // Larger TV for entertainment center
+    const bigTvWidth = w * 0.85; // TV spans most of the width
     return (
       <group>
         {/* Center cabinet */}
@@ -808,19 +810,19 @@ function TVStandModel({ w, d, color, variant = "default" }: { w: number; d: numb
             </mesh>
           ))
         )).flat()}
-        {/* TV */}
-        <mesh position={[0, centerHeight + tvHeight / 2 + 0.1, 0]} castShadow receiveShadow>
-          <boxGeometry args={[centerWidth * 0.9, tvHeight, tvThickness]} />
+        {/* Large TV */}
+        <mesh position={[0, centerHeight + bigTvHeight / 2 + 0.15, 0]} castShadow receiveShadow>
+          <boxGeometry args={[bigTvWidth, bigTvHeight, tvThickness]} />
           <meshStandardMaterial color="#111" roughness={0.3} />
         </mesh>
         {/* TV screen */}
-        <mesh position={[0, centerHeight + tvHeight / 2 + 0.1, tvThickness / 2 + 0.01]}>
-          <boxGeometry args={[centerWidth * 0.85, tvHeight - 0.2, 0.01]} />
+        <mesh position={[0, centerHeight + bigTvHeight / 2 + 0.15, tvThickness / 2 + 0.01]}>
+          <boxGeometry args={[bigTvWidth - 0.15, bigTvHeight - 0.15, 0.01]} />
           <meshStandardMaterial color="#1a1a2e" roughness={0.1} metalness={0.1} />
         </mesh>
         {/* TV stand/base */}
-        <mesh position={[0, centerHeight + 0.05, 0]} castShadow>
-          <boxGeometry args={[0.6, 0.1, 0.3]} />
+        <mesh position={[0, centerHeight + 0.08, 0]} castShadow>
+          <boxGeometry args={[0.8, 0.12, 0.4]} />
           <meshStandardMaterial color="#222" roughness={0.4} />
         </mesh>
       </group>
@@ -1159,25 +1161,31 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
   if (variant === "withLight") {
     return (
       <group
-        position={[item.x, WALL_HEIGHT - dropHeight, item.y]}
+        position={[item.x, WALL_HEIGHT, item.y]}
         onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
       >
         {/* Selection ring */}
         {isSelected && (
-          <mesh position={[0, -dropHeight / 2 - 0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[0, -dropHeight - 0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[fanRadius + 0.1, fanRadius + 0.2, 32]} />
             <meshBasicMaterial color="#fbbf24" side={2} />
           </mesh>
         )}
 
-        {/* Mounting rod */}
-        <mesh castShadow>
+        {/* Ceiling mount plate */}
+        <mesh position={[0, -0.05, 0]} castShadow>
+          <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
+          <meshStandardMaterial color="#444444" roughness={0.4} metalness={0.6} />
+        </mesh>
+
+        {/* Mounting rod - from ceiling to motor */}
+        <mesh position={[0, -dropHeight / 2, 0]} castShadow>
           <cylinderGeometry args={[0.05, 0.05, dropHeight, 8]} />
           <meshStandardMaterial color="#555555" roughness={0.4} metalness={0.6} />
         </mesh>
 
         {/* Motor housing */}
-        <mesh position={[0, -dropHeight / 2, 0]} castShadow>
+        <mesh position={[0, -dropHeight, 0]} castShadow>
           <cylinderGeometry args={[hubRadius, hubRadius * 0.8, 0.4, 32]} />
           <meshStandardMaterial color="#333333" roughness={0.3} metalness={0.7} />
         </mesh>
@@ -1188,7 +1196,7 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
             key={i}
             position={[
               Math.cos((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
-              -dropHeight / 2 - 0.1,
+              -dropHeight - 0.1,
               Math.sin((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
             ]}
             rotation={[0, (-angle * Math.PI) / 180, 0]}
@@ -1200,7 +1208,7 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
         ))}
 
         {/* Light fixture below fan */}
-        <mesh position={[0, -dropHeight / 2 - 0.35, 0]} castShadow>
+        <mesh position={[0, -dropHeight - 0.35, 0]} castShadow>
           <cylinderGeometry args={[0.3, 0.4, 0.25, 32]} />
           <meshStandardMaterial
             color="#ffffff"
@@ -1215,12 +1223,12 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
         {/* Light when on */}
         {item.isOn && (
           <>
-            <mesh position={[0, -dropHeight / 2 - 0.35, 0]}>
+            <mesh position={[0, -dropHeight - 0.35, 0]}>
               <sphereGeometry args={[0.2, 16, 16]} />
               <meshBasicMaterial color={item.lightColor} transparent opacity={0.5} />
             </mesh>
             <pointLight
-              position={[0, -dropHeight / 2 - 0.5, 0]}
+              position={[0, -dropHeight - 0.5, 0]}
               intensity={0.5 + item.lightIntensity * 2}
               color={item.lightColor}
               castShadow
@@ -1240,27 +1248,34 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
     const industrialBladeCount = 3;
     const industrialBladeLength = bladeLength * 1.3;
     const industrialBladeWidth = bladeWidth * 1.5;
+    const industrialDrop = dropHeight * 1.2;
     return (
       <group
-        position={[item.x, WALL_HEIGHT - dropHeight * 1.2, item.y]}
+        position={[item.x, WALL_HEIGHT, item.y]}
         onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
       >
         {/* Selection ring */}
         {isSelected && (
-          <mesh position={[0, -dropHeight / 2 - 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[0, -industrialDrop - 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[fanRadius * 1.2 + 0.1, fanRadius * 1.2 + 0.2, 32]} />
             <meshBasicMaterial color="#fbbf24" side={2} />
           </mesh>
         )}
 
-        {/* Thicker mounting rod */}
-        <mesh castShadow>
-          <cylinderGeometry args={[0.08, 0.08, dropHeight * 1.2, 8]} />
+        {/* Ceiling mount plate */}
+        <mesh position={[0, -0.05, 0]} castShadow>
+          <cylinderGeometry args={[0.2, 0.2, 0.1, 16]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.5} metalness={0.8} />
+        </mesh>
+
+        {/* Thicker mounting rod - from ceiling to motor */}
+        <mesh position={[0, -industrialDrop / 2, 0]} castShadow>
+          <cylinderGeometry args={[0.08, 0.08, industrialDrop, 8]} />
           <meshStandardMaterial color="#2a2a2a" roughness={0.5} metalness={0.8} />
         </mesh>
 
         {/* Larger motor housing */}
-        <mesh position={[0, -dropHeight * 0.6, 0]} castShadow>
+        <mesh position={[0, -industrialDrop, 0]} castShadow>
           <cylinderGeometry args={[hubRadius * 1.3, hubRadius * 1.1, 0.5, 32]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.8} />
         </mesh>
@@ -1273,7 +1288,7 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
               key={i}
               position={[
                 Math.cos((angle * Math.PI) / 180) * (hubRadius * 1.3 + industrialBladeLength / 2),
-                -dropHeight * 0.6 - 0.15,
+                -industrialDrop - 0.15,
                 Math.sin((angle * Math.PI) / 180) * (hubRadius * 1.3 + industrialBladeLength / 2),
               ]}
               rotation={[0, (-angle * Math.PI) / 180, 0]}
@@ -1286,7 +1301,7 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
         })}
 
         {/* Industrial bottom cap */}
-        <mesh position={[0, -dropHeight * 0.6 - 0.3, 0]} castShadow>
+        <mesh position={[0, -industrialDrop - 0.3, 0]} castShadow>
           <cylinderGeometry args={[0.1, 0.15, 0.15, 16]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.8} />
         </mesh>
@@ -1297,25 +1312,31 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
   // Default - standard fan without light
   return (
     <group
-      position={[item.x, WALL_HEIGHT - dropHeight, item.y]}
+      position={[item.x, WALL_HEIGHT, item.y]}
       onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
     >
       {/* Selection ring */}
       {isSelected && (
-        <mesh position={[0, -dropHeight / 2 - 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh position={[0, -dropHeight - 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[fanRadius + 0.1, fanRadius + 0.2, 32]} />
           <meshBasicMaterial color="#fbbf24" side={2} />
         </mesh>
       )}
 
-      {/* Mounting rod */}
-      <mesh castShadow>
+      {/* Ceiling mount plate */}
+      <mesh position={[0, -0.05, 0]} castShadow>
+        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
+        <meshStandardMaterial color="#444444" roughness={0.4} metalness={0.6} />
+      </mesh>
+
+      {/* Mounting rod - from ceiling to motor */}
+      <mesh position={[0, -dropHeight / 2, 0]} castShadow>
         <cylinderGeometry args={[0.05, 0.05, dropHeight, 8]} />
         <meshStandardMaterial color="#555555" roughness={0.4} metalness={0.6} />
       </mesh>
 
       {/* Motor housing */}
-      <mesh position={[0, -dropHeight / 2, 0]} castShadow>
+      <mesh position={[0, -dropHeight, 0]} castShadow>
         <cylinderGeometry args={[hubRadius, hubRadius * 0.8, 0.4, 32]} />
         <meshStandardMaterial color="#333333" roughness={0.3} metalness={0.7} />
       </mesh>
@@ -1326,7 +1347,7 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
           key={i}
           position={[
             Math.cos((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
-            -dropHeight / 2 - 0.1,
+            -dropHeight - 0.1,
             Math.sin((angle * Math.PI) / 180) * (hubRadius + bladeLength / 2),
           ]}
           rotation={[0, (-angle * Math.PI) / 180, 0]}
@@ -1338,7 +1359,7 @@ function CeilingFanModel({ item, isSelected, onSelect }: { item: CeilingItem; is
       ))}
 
       {/* Bottom cap */}
-      <mesh position={[0, -dropHeight / 2 - 0.25, 0]} castShadow>
+      <mesh position={[0, -dropHeight - 0.25, 0]} castShadow>
         <sphereGeometry args={[0.15, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color="#333333" roughness={0.3} metalness={0.7} />
       </mesh>
